@@ -1,0 +1,79 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.147'
+    id 'idea'
+}
+
+group = mod_group_id
+version = mod_version
+base { archivesName = 'amp-autocert' }
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories { mavenCentral() }
+
+neoForge {
+    version = project.neo_version
+    runs {
+        client { client() }
+        server {
+            server()
+            programArgument '--nogui'
+        }
+    }
+    mods {
+        "${mod_id}" { sourceSet(sourceSets.main) }
+    }
+}
+
+dependencies {
+    def acme4jClient = implementation("org.shredzone.acme4j:acme4j-client:${acme4j_version}") {
+        // Minecraft 1.21.1 strictly provides SLF4J 2.0.9; acme4j only uses its compatible API.
+        exclude group: 'org.slf4j', module: 'slf4j-api'
+    }
+    jarJar(acme4jClient) {
+        version {
+            strictly '[5.1,6.0)'
+            prefer acme4j_version
+        }
+    }
+    // ModDevGradle does not automatically embed transitive Jar-in-Jar dependencies.
+    jarJar(implementation('org.bitbucket.b_c:jose4j:0.9.6') { transitive = false }) {
+        version { strictly '[0.9.6,1.0)'; prefer '0.9.6' }
+    }
+    jarJar(implementation("org.bouncycastle:bcprov-jdk18on:${bouncycastle_version}") { transitive = false }) {
+        version { strictly "[${bouncycastle_version}]"; prefer bouncycastle_version }
+    }
+    jarJar(implementation("org.bouncycastle:bcpkix-jdk18on:${bouncycastle_version}") { transitive = false }) {
+        version { strictly "[${bouncycastle_version}]"; prefer bouncycastle_version }
+    }
+    jarJar(implementation("org.bouncycastle:bcutil-jdk18on:${bouncycastle_version}") { transitive = false }) {
+        version { strictly "[${bouncycastle_version}]"; prefer bouncycastle_version }
+    }
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'com.google.code.gson:gson:2.10.1'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
+    var replacements = [
+        mod_id: mod_id,
+        mod_name: mod_name,
+        mod_version: mod_version,
+        mod_license: mod_license,
+        minecraft_version_range: minecraft_version_range,
+        neo_version: neo_version,
+        automodpack_version: automodpack_version,
+        loader_version_range: loader_version_range
+    ]
+    inputs.properties replacements
+    expand replacements
+    from 'src/main/templates'
+    into 'build/generated/sources/modMetadata'
+}
+sourceSets.main.resources.srcDir generateModMetadata
+sourceSets.main.resources.srcDir 'config'
+neoForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.named('test', Test) { useJUnitPlatform() }

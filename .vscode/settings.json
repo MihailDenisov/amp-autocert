@@ -1,0 +1,15 @@
+{
+  "java.configuration.updateBuildConfiguration": "interactive",
+  "java.import.gradle.enabled": true,
+  "java.import.gradle.wrapper.enabled": true,
+  "java.compile.nullAnalysis.mode": "automatic",
+  "files.exclude": {
+    "**/.gradle": true,
+    "**/build": true
+  },
+  "files.watcherExclude": {
+    "**/.gradle/**": true,
+    "**/build/**": true,
+    "**/run/**": true
+  }
+}

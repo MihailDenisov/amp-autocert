@@ -1,0 +1,32 @@
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
+license="${mod_license}"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+description="Dedicated-server certificate renewal scaffold for AutoModpack (ACME DNS-01 / Cloudflare)."
+authors="amp-autocert contributors"
+displayTest="IGNORE_ALL_VERSION"
+
+[[dependencies.${mod_id}]]
+modId="neoforge"
+type="required"
+versionRange="[${neo_version},)"
+ordering="NONE"
+side="SERVER"
+
+[[dependencies.${mod_id}]]
+modId="minecraft"
+type="required"
+versionRange="${minecraft_version_range}"
+ordering="NONE"
+side="SERVER"
+
+[[dependencies.${mod_id}]]
+modId="automodpack_mod"
+type="required"
+versionRange="[${automodpack_version}]"
+ordering="AFTER"
+side="SERVER"

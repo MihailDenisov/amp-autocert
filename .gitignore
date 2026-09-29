@@ -1,0 +1,26 @@
+.gradle/
+.gradle-user-home/
+build/
+bin/
+run/
+runs/
+out/
+*.class
+*.log
+.idea/
+.vscode/.classpath
+.vscode/.project
+.classpath
+.project
+.settings/
+# First-run bootstrap downloads official wrapper JAR; do not blindly commit unreviewed binaries.
+gradle/wrapper/gradle-wrapper.jar
+# Never check in keys, account state, Cloudflare credentials or server runtime files.
+**/credentials/
+**/private-key.pem
+**/privkey.pem
+**/account-key*
+**/*cloudflare-token*
+.env
+.env.*
+automodpack/amp-autocert.properties
