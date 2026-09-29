@@ -1,9 +1,11 @@
 # Production setup and recovery
 
-This runbook applies only to Minecraft 1.21.1, NeoForge 21.1.248, Java 21, and
-AutoModpack 5.0.0-rc.1. The connected renewal lifecycle is still experimental:
-do not enable it on the production zone until the Java 21 dedicated-server test
-and a separate test-zone issuance/activation exercise have passed.
+This runbook applies only to Minecraft 1.21.1, NeoForge 21.1.248, and inspected
+AutoModpack versions in `[5.0.0-rc.1,5.0.0-rc.2]`. The reference deployment
+completed live Let's Encrypt production issuance, Cloudflare DNS-01 cleanup,
+credential rotation, AutoModpack 5.0.0-rc.2 activation, restart persistence, and
+client trust verification on 2026-09-29. Every new installation must still use
+its own controlled rollout; production mode is never enabled by default.
 
 ## 1. DNS and network prerequisites
 
@@ -57,7 +59,7 @@ automodpack/amp-autocert.properties
 Review every `from-server` rule at the same time. A broad rule must not make the
 credential directory, public config, token, ACME account state, transaction
 journals, backups, certificate, or private key available to clients. These
-exclusions are required defense in depth even though AutoModpack 5.0.0-rc.1
+exclusions are required defense in depth even though supported AutoModpack rc.1/rc.2
 normally builds a group from its host-modpack directory and explicit
 `from-server` entries.
 
@@ -121,7 +123,7 @@ ACME account keys, the Cloudflare token file, issuance state, and deployment
 recovery data.
 
 Never back up or restore only one of `certificate.crt` and `private-key.pem`.
-They are a pair. AutoModpack 5.0.0-rc.1 expects:
+They are a pair. Supported AutoModpack rc.1/rc.2 expects:
 
 - `automodpack/credentials/certificate.crt`: leaf-first PEM full chain;
 - `automodpack/credentials/private-key.pem`: unencrypted PKCS#8 PEM key.
@@ -150,18 +152,20 @@ persisted cooldown prevents repeated orders. It never writes `certificate.crt` o
 `private-key.pem`, never restarts AutoModpack, and is rejected in production.
 Return the switch to `false` after the exercise.
 
-Before production, complete a separate controlled test-zone exercise using no
-production token or production domain. That exercise must demonstrate DNS-01
-record creation and cleanup, certificate validation, AutoModpack activation,
-rollback, Java 21 shutdown, permission denial, and NeoForge's dependency-check
-rejection when AutoModpack 5.0.0-rc.1 is absent or incompatible.
-The current repository has deterministic fake coverage, but that is not proof of
-a live provider or server integration.
+Before enabling a new production installation, complete a separate controlled
+test-zone exercise using no production token or production domain. That exercise
+should demonstrate DNS-01 record creation and cleanup, certificate validation,
+AutoModpack activation, rollback, Java 21 shutdown, permission denial, and
+NeoForge's dependency-check rejection when AutoModpack is absent, outside the
+inspected rc.1/rc.2 range, or API-incompatible.
+The repository has deterministic fake coverage and the reference installation
+has completed one live production flow; neither substitutes for validating a
+different server, provider token, network, or AutoModpack configuration.
 
 Only after those checks pass:
 
 1. Stop the server and refresh the private credentials backup.
-2. Confirm AutoModpack is exactly 5.0.0-rc.1 and its host is configured to use
+2. Confirm AutoModpack is rc.1 or rc.2 and its host is configured to use
    its internal TLS files.
 3. Confirm the restricted Cloudflare token is available and both exclusion
    patterns apply to every group.
@@ -219,7 +223,7 @@ the migration; certificate renewal cannot silently override it.
 | More diagnostics required | Temporarily set `debugmode=true` and restart. Do not publish `debug.log`; protected protocol data remains suppressed, but server topology may appear. |
 | Token missing/unreadable | Set `AMP_AUTOCERT_CF_API_TOKEN` or check the fixed credential file. Never print the token to test it. |
 | Token-file permissions too broad | Fix panel permissions, or explicitly enable only the documented Pterodactyl fallback and restrict panel/SFTP users. |
-| NeoForge rejects a missing/incompatible `automodpack_mod` dependency | Install exactly AutoModpack 5.0.0-rc.1. Other versions are deliberately unsupported until their APIs and credential paths are re-verified. |
+| NeoForge rejects a missing/incompatible `automodpack_mod` dependency | Install AutoModpack in `[5.0.0-rc.1,5.0.0-rc.2]`. New releases require source/runtime inspection before the supported range is widened. |
 | AutoModpack host is not initialized | Check AutoModpack's own host configuration and startup errors; renewal remains blocked rather than guessing another API. |
 | `host.restartAfterRenew=false` | Set it to `true` only after restart/readiness integration has been accepted. |
 | Production cooldown active | Wait until `/ampautocert status` reports the next allowed attempt; restarts and repeated commands do not clear it. |

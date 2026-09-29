@@ -27,6 +27,6 @@ side="SERVER"
 [[dependencies.${mod_id}]]
 modId="automodpack_mod"
 type="required"
-versionRange="[${automodpack_version}]"
+versionRange="${automodpack_version_range}"
 ordering="AFTER"
 side="SERVER"

@@ -11,7 +11,7 @@
 | Language | Java 21 |
 | Minecraft | 1.21.1 |
 | NeoForge | **21.1.248**, do not upgrade without approval |
-| AutoModpack | **5.0.0-rc.1**, verified from operator-provided source ZIP and runtime JAR |
+| AutoModpack | **5.0.0-rc.1 or 5.0.0-rc.2**, with runtime host-API verification |
 | Runtime | Dedicated Minecraft server, no OS-level cron, sudo or external Certbot |
 | DNS provider | Cloudflare (registrar REG.RU, DNS in Cloudflare) |
 | Zone | `maicraft.tech` |
@@ -26,7 +26,7 @@
 
 The mod runs *only* server-side. Clients do NOT install it. Both `play.maicraft.tech` (entered by the player) and `hm.maicraft.tech` (advertised endpoint) are covered by the requested wildcard certificate. Cloudflare Origin CA certificates are NOT publicly trusted by Java clients connecting directly to an origin: do not use Origin CA. Do not create SRV records for the modpack endpoint.
 
-AutoModpack `5.0.0-rc.1` source and runtime bytecode define `automodpack/credentials/certificate.crt` (PEM fullchain) and `automodpack/credentials/private-key.pem` (PKCS#8 PEM private key). Do not substitute `certificate.cert` or rely on old `.private/cert.crt` instructions. Re-verify these constants before upgrading AutoModpack.
+Verified AutoModpack 5.0.0-rc.1/rc.2 layouts define `automodpack/credentials/certificate.crt` (PEM fullchain) and `automodpack/credentials/private-key.pem` (PKCS#8 PEM private key). Do not substitute `certificate.cert` or rely on old `.private/cert.crt` instructions. Re-verify these constants before supporting any newer release.
 
 Source references:
 - https://moddedmc.wiki/en/project/automodpack/latest/docs/security
@@ -75,7 +75,7 @@ Add unit tests, deterministic fake ACME/Cloudflare integration tests, error hand
 ### Milestone E: operators, observability and tests
 1. Add permission-restricted server-side `/ampautocert status`, `/ampautocert check`, and `/ampautocert renew` (optional `--force` guarded by operator permission). Never display token, account key, raw Cloudflare responses or private key.
 2. Check at startup and every configured interval (default 24h), renew when expiration is within 30 days, apply bounded exponential retry with jitter when failures occur, and prevent Let's Encrypt rate-limit storms. Never run an unchecked hourly creation loop.
-3. Report which issuer/environment is active, expiry, days left, last check/outcome, and currently deployed SANs; redact secrets. Declare AutoModpack `5.0.0-rc.1` implementation mod ID `automodpack_mod` as an exact required server-side NeoForge dependency, so a missing or incompatible AutoModpack installation is rejected during mod dependency validation, and cover that failure in the dedicated-server integration test.
+3. Report which issuer/environment is active, expiry, days left, last check/outcome, and currently deployed SANs; redact secrets. Declare AutoModpack implementation mod ID `automodpack_mod` as a required server-side NeoForge dependency in the inspected `[5.0.0-rc.1,5.0.0-rc.2]` range, so a missing or version-incompatible installation is rejected during mod dependency validation. Reject an API-incompatible host during runtime preflight, and cover both boundaries in dedicated-server integration tests.
 4. Tests must cover missing/valid/due/expired cert, DST/time boundaries, bad SAN, mismatched private key, invalid chain, staging-production separation, concurrent wildcard/apex TXT records, Cloudflare HTTP failure, partial rollback, idempotent DNS cleanup, restart on the server thread, missing permissions and no-secret logging.
 5. Verify Gradle `test`, `build`, dedicated `runServer`, jar-in-jar dependency resolution and actual test connection to a separately configured AutoModpack test server. Do not use the real domain or real API token in integration tests.
 6. Write a production setup guide with Cloudflare API token permissions, DNS-only origin routing, config exclusions, staging-to-production process, backup/restore, certificate rotation behavior and troubleshooting. Warn that *existing* player fingerprint pins override CA trust until the player removes the old pin.

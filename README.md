@@ -2,7 +2,7 @@
 
 Starter VS Code project for a **server-only** Minecraft **1.21.1** mod on **NeoForge 21.1.248**, using **Java 21**. Intended outcome: manage public Let's Encrypt certificates for AutoModpack via Cloudflare DNS-01 without OS-level Certbot or cron.
 
-> **Status: EXPERIMENTAL RENEWAL LIFECYCLE, NOT YET PRODUCTION-VALIDATED.** The single-flight coordinator connects the tested ACME, Cloudflare DNS-01, validation, crash-safe replacement, and AutoModpack 5.0.0-rc.1 activation/rollback components. Scheduled staging mode remains inspection-only. A separate operator-only staging probe can issue and structurally inspect a certificate without trusting or deploying it, but its live test-zone exercise and the Java 21 dedicated-server pass are still required before production enablement.
+> **Status: PRODUCTION PIPELINE VALIDATED.** On 2026-09-29 the operator completed live Let's Encrypt production issuance for the configured apex/wildcard pair, Cloudflare DNS-01 cleanup, crash-safe credential replacement, and activation through AutoModpack 5.0.0-rc.2. A restart retained the deployed certificate, `/ampautocert check` reported `VALID/not_due` with the expected SANs, and a client connected without manually entering a fingerprint. Fresh installations still default to disabled staging mode and must follow the production runbook.
 
 ## Open in VS Code
 
@@ -25,12 +25,12 @@ Starter VS Code project for a **server-only** Minecraft **1.21.1** mod on **NeoF
 
 Cloudflare **Origin CA is not sufficient** for direct Minecraft clients; use Let's Encrypt or another publicly trusted CA. Wildcard `*.maicraft.tech` covers both `play` and `hm` hostnames.
 
-## Server configuration (before production enablement)
+## Server configuration
 
 - AutoModpack implementation mod ID `automodpack_mod` is a required server-side
-  NeoForge dependency pinned to exactly `5.0.0-rc.1`. NeoForge rejects server
-  startup during dependency validation if that mod is missing or has another
-  version; amp-autocert does not provide an AutoModpack-absent operating mode.
+  NeoForge dependency with range `[5.0.0-rc.1,5.0.0-rc.2]`. These are the two
+  releases whose credential paths and restart API were inspected. NeoForge
+  rejects missing or other versions; runtime activation also verifies the host API shape.
 - Copy `config/amp-autocert.properties.example` to the actual Minecraft server's `automodpack/amp-autocert.properties`. It is a non-secret operational file. Keep `enabled=false`, `acme.environment=staging`, and `acme.allowStagingIssuance=false` until a separate test zone and restricted token are ready. Scheduled staging mode never creates or deploys a certificate. The explicit staging probe structurally inspects and discards its untrusted result; production issuance requires `enabled=true`, `acme.environment=production`, and `host.restartAfterRenew=true`.
 - The properties file is the canonical source for the DNS zone/challenge owner, certificate domains, Let's Encrypt directory URLs, Cloudflare API root/TTL, public DNS-over-HTTPS resolvers, Minecraft hostname/SRV target, AutoModpack endpoint and bounded network/propagation timings. Apex/wildcard pairing, same-zone one-label hosts and official HTTPS provider endpoints are validated before use. Propagation waits `dns.propagationInitialDelaySeconds=15`, then requires the TXT values to agree across Cloudflare and Google DoH; one temporarily unavailable resolver is tolerated.
 - `debugmode=false` is the default concise logging mode. Setting it to `true` adds safe ACME phase, resolver hostname/status/latency, TXT count, retry timing, consensus and cleanup/recovery diagnostics. Third-party raw ACME/JWS/DNS responses, challenge values, provider tokens, account state, certificate bytes and private keys remain suppressed in both modes.
@@ -42,7 +42,7 @@ Cloudflare **Origin CA is not sufficient** for direct Minecraft clients; use Let
 - If a Pterodactyl provider permits neither environment variables nor permission changes, set `credentials.allowInsecureTokenFilePermissions=true` and use that same fixed token file. This deliberately accepts panel-managed read permissions such as `0644`; writable-by-other token files/directories, alternate paths and symlinks remain rejected. Restrict panel/SFTP access to trusted administrators and keep `automodpack/credentials/**` excluded from every modpack group. Leave this option `false` everywhere else.
 - On the same restricted hosting, `credentials.allowInsecureDeploymentFilePermissions=true` prevents the future deployer from calling `chmod` or rewriting ACLs for staged certificates, keys, backups and journals. It still refuses POSIX paths writable by group/others, but may leave private material readable according to the panel/umask defaults. Restrict panel/SFTP access and leave this option `false` when permission management works.
 - Never put secrets in the public amp-autocert properties file. Explicitly exclude `automodpack/amp-autocert.properties` as well as every credential/state directory from AutoModpack's file rules; do not rely on undocumented exclusion behavior.
-- AutoModpack `5.0.0-rc.1` source and runtime JAR both use `automodpack/credentials/certificate.crt` for the full chain and `automodpack/credentials/private-key.pem` for an unencrypted PKCS#8 private key. The bytecode does not use `certificate.cert`.
+- Supported AutoModpack rc.1/rc.2 installations use `automodpack/credentials/certificate.crt` for the full chain and `automodpack/credentials/private-key.pem` for an unencrypted PKCS#8 private key. The verified bytecode does not use `certificate.cert`.
 - In `automodpack/server.conf`, add `automodpack/credentials/**` and `automodpack/amp-autocert.properties` to every group's `exclude` list. Version 5 includes only `automodpack/host-modpack/<group>/` plus paths selected by that group's `from-server`; these exclusions are defense in depth against future or operator-added broad rules.
 - Do not publish a staging cert to users. Existing players with manual certificate pins must clear the old pin once when moving to public CA; subsequent public CA renewals should not require re-pinning on new clients.
 
@@ -55,7 +55,7 @@ The dedicated server registers these permission-level-3 commands:
 - `/ampautocert staging-issue` is accepted only with `acme.environment=staging` and `acme.allowStagingIssuance=true`. It creates the configured DNS-01 records, obtains a Let's Encrypt staging certificate, inspects its key/chain structure, SANs and hostname coverage in memory, cleans up its owned TXT records, and discards the untrusted result. A persisted environment-specific cooldown prevents repeated orders. It never writes or activates AutoModpack credentials.
 - `/ampautocert renew` requests renewal even when the deployed certificate is not yet due. It is rejected outside production mode and cannot bypass the persisted issuance cooldown, AutoModpack preflight, certificate validation, deployment rollback, or the single-flight gate. Use it only for an intentional production rotation.
 
-All commands inherit the parent permission-level-3 requirement. Dedicated-server permission-denial testing remains part of the final integration pass.
+All commands inherit the parent permission-level-3 requirement. The permission predicate has deterministic coverage; operators should still confirm their server's permission mapping before delegating command access.
 
 The complete preparation, restricted Cloudflare token, backup, staging-to-production,
 rotation, rollback, fingerprint-pin, and troubleshooting procedure is in
@@ -86,8 +86,8 @@ from the short configuration notes alone.
 | `.agents/skills/` | NeoForge, ACME/Cloudflare, TLS deployment, security, token-budget skills |
 | `docs/IMPLEMENTATION_LOG.md` | compact milestone handoff |
 
-## Important limits of this delivered archive
+## Validation boundaries
 
-The current workspace has deterministic coverage for the connected coordinator, including persisted issuance cooldown and two-phase crash recovery that retains its rollback marker until AutoModpack reloads the restored fingerprint. No real ACME order, Cloudflare mutation, or AutoModpack host restart was performed by those tests. A dedicated Java 21 server integration run and an opt-in issuance against a separate test zone remain required before production enablement. No user API keys, real certificates or pre-issued ACME accounts are embedded.
+The workspace has deterministic fake coverage for the connected coordinator, persisted issuance cooldown, DNS cleanup, certificate validation, deployment, activation, rollback, and two-phase crash recovery. The operator additionally completed the live production flow described above on the target NeoForge/AutoModpack server. That one successful deployment does not replace regression tests or prove every provider failure and crash boundary in production. No user API keys, real certificates, ACME account state, or other runtime secrets are embedded in the repository or release JAR.
 
 References: [NeoForge 1.21.1](https://docs.neoforged.net/docs/1.21.1/gettingstarted/) · [AutoModpack security](https://moddedmc.wiki/en/project/automodpack/latest/docs/security) · [acme4j](https://github.com/shred/acme4j) · [Codex subagents](https://developers.openai.com/codex/subagents) · [Codex skills](https://developers.openai.com/codex/skills).

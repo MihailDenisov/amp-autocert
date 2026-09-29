@@ -11,9 +11,9 @@ import java.util.concurrent.CompletionStage;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
-/** Version-pinned AutoModpack 5.0.0-rc.1 host control and readiness inspection. */
+/** Host control for the inspected AutoModpack 5.0.0 release candidates. */
 final class AutoModpackHostControl {
-    static final String SUPPORTED_VERSION = "5.0.0-rc.1";
+    static final String SUPPORTED_VERSION_RANGE = "5.0.0-rc.1 through 5.0.0-rc.2";
     private static final String RESTART_COMMAND = "automodpack host restart";
 
     private final RestartDispatcher restartDispatcher;
@@ -111,7 +111,7 @@ final class AutoModpackHostControl {
 
         static HostSnapshot incompatible() {
             return new HostSnapshot(false, false, false, null,
-                    "AutoModpack version is not " + SUPPORTED_VERSION);
+                    "AutoModpack version is outside " + SUPPORTED_VERSION_RANGE);
         }
     }
 
@@ -162,7 +162,7 @@ final class AutoModpackHostControl {
             try {
                 Field versionField = constants.getField("AM_VERSION");
                 Object version = versionField.get(null);
-                if (!SUPPORTED_VERSION.equals(version)) return HostSnapshot.incompatible();
+                if (!isSupportedVersion(version)) return HostSnapshot.incompatible();
 
                 Object host = constants.getField("hostServer").get(null);
                 if (host == null) {
@@ -176,7 +176,7 @@ final class AutoModpackHostControl {
                 return new HostSnapshot(true, running, fingerprint, running
                         ? "AutoModpack host is running" : "AutoModpack host is stopped");
             } catch (ReflectiveOperationException | ClassCastException | IllegalArgumentException incompatible) {
-                throw new IOException("AutoModpack " + SUPPORTED_VERSION + " host state API is unavailable");
+                throw new IOException("AutoModpack " + SUPPORTED_VERSION_RANGE + " host state API is unavailable");
             }
         }
 
@@ -191,15 +191,19 @@ final class AutoModpackHostControl {
         private Object compatibleHost() throws IOException {
             try {
                 Class<?> constants = Class.forName(CONSTANTS, true, classLoader);
-                if (!SUPPORTED_VERSION.equals(constants.getField("AM_VERSION").get(null))) {
-                    throw new IOException("AutoModpack version is not " + SUPPORTED_VERSION);
+                if (!isSupportedVersion(constants.getField("AM_VERSION").get(null))) {
+                    throw new IOException("AutoModpack version is outside " + SUPPORTED_VERSION_RANGE);
                 }
                 Object host = constants.getField("hostServer").get(null);
                 if (host == null) throw new IOException("AutoModpack host is not initialized");
                 return host;
             } catch (ReflectiveOperationException | LinkageError incompatible) {
-                throw new IOException("AutoModpack " + SUPPORTED_VERSION + " host state API is unavailable");
+                throw new IOException("AutoModpack " + SUPPORTED_VERSION_RANGE + " host state API is unavailable");
             }
         }
+    }
+
+    static boolean isSupportedVersion(Object value) {
+        return "5.0.0-rc.1".equals(value) || "5.0.0-rc.2".equals(value);
     }
 }

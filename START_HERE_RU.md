@@ -2,9 +2,11 @@
 
 Это заготовка проекта для **VS Code + Codex**: Java 21, Minecraft 1.21.1, NeoForge **21.1.248**. Имя распространяемого мода — `amp-autocert`, технический mod ID — `amp_autocert` (дефис недопустим для mod ID).
 
-**Важно:** единичный renewal coordinator теперь связывает ACME/DNS-01, проверку сертификата, аварийно-восстанавливаемую замену файлов и активацию/rollback через AutoModpack 5.0.0-rc.1. Реальная выдача ещё не проверена на отдельной тестовой зоне, поэтому по умолчанию мод отключён. Плановая staging-проверка ничего не выдаёт. Отдельная команда `/ampautocert staging-issue` доступна только при явном `acme.allowStagingIssuance=true`: она выдаёт staging-сертификат, проверяет его структуру в памяти без доверия к staging CA, очищает свои TXT-записи и не меняет файлы AutoModpack. Повторные orders ограничены сохраняемым cooldown.
+**Статус:** production pipeline проверен оператором 29.09.2026: Let's Encrypt выдал сертификат для apex/wildcard, DNS-01 записи Cloudflare были очищены, файлы безопасно заменены, AutoModpack 5.0.0-rc.2 активировал сертификат, а после перезапуска `/ampautocert check` показал `VALID/not_due` и правильные SAN. Клиент подключился без ручного ввода fingerprint. Для новых установок сохраняются безопасные значения по умолчанию: мод выключен и выбран staging.
 
-Реальный mod ID загружаемой реализации AutoModpack — `automodpack_mod`; это обязательная server-side зависимость NeoForge с точной версией `5.0.0-rc.1`. Если мод отсутствует или установлена другая версия, NeoForge остановит запуск на проверке зависимостей; режим работы amp-autocert без AutoModpack не предусмотрен.
+Единичный renewal coordinator связывает ACME/DNS-01, проверку сертификата, аварийно-восстанавливаемую замену файлов и активацию/rollback через проверенные AutoModpack 5.0.0-rc.1/rc.2. Плановая staging-проверка ничего не выдаёт. Отдельная команда `/ampautocert staging-issue` доступна только при явном `acme.allowStagingIssuance=true`: она выдаёт staging-сертификат, проверяет его структуру в памяти без доверия к staging CA, очищает свои TXT-записи и не меняет файлы AutoModpack. Повторные orders ограничены сохраняемым cooldown.
+
+Реальный mod ID загружаемой реализации AutoModpack — `automodpack_mod`; это обязательная server-side зависимость NeoForge с диапазоном `[5.0.0-rc.1,5.0.0-rc.2]`. Проверены rc.1 и rc.2; отсутствующие и другие версии отклоняются. Перед активацией дополнительно проверяется требуемый runtime API. Новую версию нужно сначала проверить по исходникам и на сервере, затем явно добавить в диапазон.
 
 1. Распакуй архив и открой папку `amp-autocert` в VS Code.
 2. Установи JDK 21 и предложенные VS Code расширения Java/Gradle.
@@ -28,6 +30,6 @@
 
 Для будущей установки сертификата на таком хостинге параметр `credentials.allowInsecureDeploymentFilePermissions=true` запрещает моду вызывать `chmod` или менять ACL файлов сертификата, ключа, резервной копии и журнала. Пути с правом записи для группы/остальных всё равно отклоняются, но чтение может остаться разрешённым согласно настройкам панели/umask. Используй этот режим только при ограниченном доступе к панели/SFTP; обычно оставляй `false`.
 
-В проверенных исходниках и runtime JAR AutoModpack `5.0.0-rc.1` используются `automodpack/credentials/certificate.crt` и `automodpack/credentials/private-key.pem`. В `automodpack/server.conf` добавь `automodpack/credentials/**` и `automodpack/amp-autocert.properties` в `exclude` каждого modpack group. Имя `certificate.cert` этот JAR не читает.
+В поддерживаемых AutoModpack rc.1/rc.2 используются `automodpack/credentials/certificate.crt` и `automodpack/credentials/private-key.pem`. В `automodpack/server.conf` добавь `automodpack/credentials/**` и `automodpack/amp-autocert.properties` в `exclude` каждого modpack group. Проверенный runtime не читает имя `certificate.cert`.
 
 Полная инструкция по подготовке Cloudflare, резервному копированию, переходу staging -> production, откату, fingerprint pins и диагностике находится в [`docs/PRODUCTION_SETUP.md`](docs/PRODUCTION_SETUP.md). Не включай production только по краткой памятке выше.

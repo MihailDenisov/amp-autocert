@@ -7,13 +7,13 @@ Update this file after each significant milestone. Avoid transcript dumps.
 - [x] A: Gradle 8.14.3 / ModDevGradle 2.0.147 / Java 21 / NeoForge 21.1.248 build and dedicated-server startup validated.
 - [x] B: Secret-safe fixed-topology configuration, private paths and AutoModpack 5 exclusion behavior verified.
 - [x] C: ACME v2 DNS-01 + Cloudflare real implementation with fake tests.
-- [ ] D: PKIX/hostname/keypair validation, crash-safe deployment and AutoModpack activation.
-- [ ] E: Commands, scheduling/retry, dedicated-server/integration tests and operator documentation.
+- [x] D: PKIX/hostname/keypair validation, crash-safe deployment and AutoModpack activation.
+- [x] E: Commands, scheduling/retry, dedicated-server/integration tests and operator documentation.
 
-## Current blockers / open questions
+## Current validation boundaries
 
-- The pipeline is connected, but no real ACME/Cloudflare request or AutoModpack certificate restart has been performed. Keep production disabled pending a separate test-zone issuance and dedicated-server activation exercise.
-- Milestone E still needs command permission/runtime integration tests and the final Java 21 server exercise with the required AutoModpack dependency installed.
+- The reference server completed the live production pipeline and client acceptance described in the latest milestone below. Fresh installations remain disabled/staging by default and require their own controlled rollout.
+- Deterministic tests cover failure, rollback and permission behavior; one successful live deployment does not exercise every crash/provider-failure boundary.
 
 ## Pterodactyl credential compatibility (2026-09-27)
 
@@ -228,3 +228,19 @@ The live server still reported Java 25 rather than the required Java 21. Its sta
 - Packaged artifact: `build/libs/amp-autocert-0.1.0-SNAPSHOT.jar`, 8,508,277 bytes, SHA-256 `9c3cd1da1ae3d4f5a07dfba7281a4ed5cb1d14b8706711be3a96631d732d8cd6`.
 
 Live verification remains required after the staging cooldown permits another attempt. Cloudflare TTL controls downstream caching, not how long amp-autocert owns the record; the transaction still deletes its TXT records after success or failure.
+
+## Milestone E increment 8: bounded AutoModpack rc.1/rc.2 compatibility (2026-09-29)
+
+- Added rc.2 to the required NeoForge dependency and runtime allowlist. Final security review rejected the initial all-5.x range because a future release could retain the reflected method names while changing credential paths or restart behavior. The final range is `[5.0.0-rc.1,5.0.0-rc.2]`; all other versions fail closed until inspected.
+- Runtime compatibility accepts only rc.1 and rc.2. Reflection still requires `AM_VERSION`, `hostServer`, `isRunning()` and `getCertificateFingerprint()` before any deployment or restart.
+- Verified the official rc.2 tag source (`8d51399`): the NeoForge implementation mod ID remains `automodpack_mod`; credential paths remain `automodpack/credentials/certificate.crt` and `private-key.pem`; `Constants.AM_VERSION`/`hostServer`, `NettyServer.isRunning()`/`getCertificateFingerprint()`, and the permission-level-3 asynchronous `/automodpack host restart` integration remain compatible. Dedicated-server startup with the operator's exact runtime JAR remains the final runtime proof.
+- Final focused verification: Git Bash `scripts/offline-smoke-test.sh` passed; the version-policy and activation tests passed (16 tests, 0 failures/errors); generated NeoForge metadata contains `[5.0.0-rc.1,5.0.0-rc.2]`. The full unrelated suite was intentionally omitted for this short iteration.
+- Packaged artifact `build/libs/amp-autocert-0.1.0-SNAPSHOT.jar`: 8,508,436 bytes, SHA-256 `08dce6a728fd72d4db35967446c3cce8c4e8adadc432bed16be905067119935e`. Archive inspection found no token file, certificate, private key, ACME account key, issuance journal, or deployment journal.
+
+## Production acceptance and milestone completion (2026-09-29)
+
+- The operator moved the tested build to the main NeoForge 21.1.248 server with AutoModpack 5.0.0-rc.2. Startup loaded the required dependency and the amp-autocert lifecycle in production mode; AutoModpack served its internal TLS endpoint on port 25809.
+- A permission-level-3 `/ampautocert renew` completed the real Let's Encrypt production flow for `maicraft.tech` and `*.maicraft.tech`: Cloudflare DNS-01 authorization succeeded, the validated certificate/key pair replaced the previous AutoModpack-generated pair, and AutoModpack restarted its host and reported a new fingerprint. Amp-autocert logged the final renewed-and-activated outcome.
+- A deliberately repeated forced renewal was blocked by the persisted 48-hour cooldown. Restarting cancelled its in-memory guarded retry. After restart, `/ampautocert check` reported `VALID` with expiry `2026-12-28T18:19:52Z`; `/ampautocert status` reported both expected DNS SANs and `outcome: not_due`.
+- The operator confirmed the certificate files were replaced, owned TXT records were removed, and a real client used the service without manually entering a fingerprint. This closes the live issuance, deployment, activation, restart-persistence, normal-check, cleanup, and client-trust acceptance path for the reference installation.
+- AutoModpack rc.2 may label `automodpack/amp-autocert.properties` as an old leftover because AutoModpack itself does not consume that file. It remains the active amp-autocert configuration and must not be deleted; credential and private-state paths must also remain excluded from modpack distribution.
