@@ -7,13 +7,13 @@ debugmode=false
 acme.environment=staging
 # Manual staging DNS-01 probe only. It structurally inspects in memory, then discards the result.
 acme.allowStagingIssuance=false
-acme.email=admin@maicraft.tech
-acme.domains=maicraft.tech,*.maicraft.tech
+acme.email=admin@mydomain.com
+acme.domains=mydomain.com,*.mydomain.com
 acme.stagingDirectory=https://acme-staging-v02.api.letsencrypt.org/directory
 acme.productionDirectory=https://acme-v02.api.letsencrypt.org/directory
 acme.networkTimeoutSeconds=30
-dns.zoneName=maicraft.tech
-dns.challengeRecord=_acme-challenge.maicraft.tech
+dns.zoneName=mydomain.com
+dns.challengeRecord=_acme-challenge.mydomain.com
 dns.propagationTimeoutSeconds=120
 # Wait briefly before the first lookup, then require agreement from both public DNS-over-HTTPS resolvers.
 dns.propagationInitialDelaySeconds=15
@@ -25,9 +25,9 @@ cloudflare.ttlSeconds=60
 credentials.allowInsecureTokenFilePermissions=false
 # Pterodactyl fallback only. Deployment will not attempt chmod/ACL changes when true.
 credentials.allowInsecureDeploymentFilePermissions=false
-minecraft.hostname=play.maicraft.tech
-minecraft.srvTarget=hm.maicraft.tech:25598
-automodpack.endpoint=hm.maicraft.tech:25809
+minecraft.hostname=play.mydomain.com
+minecraft.srvTarget=host.mydomain.com:25565
+automodpack.endpoint=host.mydomain.com:25570
 renew.beforeDays=30
 check.intervalHours=24
 # Persisted minimum interval between production issuance attempts, including failed activations.

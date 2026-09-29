@@ -39,16 +39,16 @@ class IssuedCertificateValidatorTest {
     @TempDir Path root;
 
     @Test void acceptsTrustedProductionChainExactSansHostsAndMatchingPkcs8Key() throws Exception {
-        Fixture fixture = Fixture.valid(NOW, List.of("maicraft.tech", "*.maicraft.tech"));
+        Fixture fixture = Fixture.valid(NOW, List.of("mydomain.com", "*.mydomain.com"));
 
         var result = fixture.validator().validateForDeployment(fixture.material(AcmeEnvironment.PRODUCTION), config());
 
         assertEquals(Instant.parse("2026-12-26T12:00:00Z"), result.notAfter());
-        assertEquals(Set.of("maicraft.tech", "*.maicraft.tech"), Set.copyOf(result.dnsSans()));
+        assertEquals(Set.of("mydomain.com", "*.mydomain.com"), Set.copyOf(result.dnsSans()));
     }
 
     @Test void refusesStagingMaterialBeforePkixOrDeployment() throws Exception {
-        Fixture fixture = Fixture.valid(NOW, List.of("maicraft.tech", "*.maicraft.tech"));
+        Fixture fixture = Fixture.valid(NOW, List.of("mydomain.com", "*.mydomain.com"));
 
         CertificateException failure = assertThrows(CertificateException.class,
                 () -> fixture.validator().validateForDeployment(fixture.material(AcmeEnvironment.STAGING), config()));
@@ -57,22 +57,22 @@ class IssuedCertificateValidatorTest {
     }
 
     @Test void inspectsStagingProbeStructurallyWithoutTrustingItForDeployment() throws Exception {
-        Fixture fixture = Fixture.valid(NOW, List.of("maicraft.tech", "*.maicraft.tech"));
-        Fixture unrelated = Fixture.valid(NOW, List.of("maicraft.tech", "*.maicraft.tech"));
+        Fixture fixture = Fixture.valid(NOW, List.of("mydomain.com", "*.mydomain.com"));
+        Fixture unrelated = Fixture.valid(NOW, List.of("mydomain.com", "*.mydomain.com"));
         var validator = new IssuedCertificateValidator(Clock.fixed(NOW, ZoneOffset.UTC),
                 Set.of(new TrustAnchor(unrelated.rootCertificate, null)));
 
         var result = validator.inspectStagingProbe(
                 fixture.material(AcmeEnvironment.STAGING), stagingConfig());
 
-        assertEquals(Set.of("maicraft.tech", "*.maicraft.tech"), Set.copyOf(result.dnsSans()));
+        assertEquals(Set.of("mydomain.com", "*.mydomain.com"), Set.copyOf(result.dnsSans()));
         assertThrows(CertificateException.class, () -> validator.inspectStagingProbe(
                 fixture.material(AcmeEnvironment.PRODUCTION), stagingConfig()));
     }
 
     @Test void rejectsUntrustedChain() throws Exception {
-        Fixture fixture = Fixture.valid(NOW, List.of("maicraft.tech", "*.maicraft.tech"));
-        Fixture unrelated = Fixture.valid(NOW, List.of("maicraft.tech", "*.maicraft.tech"));
+        Fixture fixture = Fixture.valid(NOW, List.of("mydomain.com", "*.mydomain.com"));
+        Fixture unrelated = Fixture.valid(NOW, List.of("mydomain.com", "*.mydomain.com"));
         var validator = new IssuedCertificateValidator(Clock.fixed(NOW, ZoneOffset.UTC),
                 Set.of(new TrustAnchor(unrelated.rootCertificate, null)));
 
@@ -81,10 +81,10 @@ class IssuedCertificateValidatorTest {
     }
 
     @Test void rejectsUnexpectedSansAndMissingHostnameCoverage() throws Exception {
-        Fixture fixture = Fixture.valid(NOW, List.of("maicraft.tech", "*.evil.example"));
+        Fixture fixture = Fixture.valid(NOW, List.of("mydomain.com", "*.evil.example"));
         var material = new AcmeIssuanceService.IssuedMaterial(AcmeEnvironment.PRODUCTION,
                 fixture.fullChainPem, fixture.leafKey.getPrivate().getEncoded(),
-                List.of("maicraft.tech", "*.maicraft.tech"));
+                List.of("mydomain.com", "*.mydomain.com"));
 
         CertificateException failure = assertThrows(CertificateException.class,
                 () -> fixture.validator().validateForDeployment(material, config()));
@@ -93,7 +93,7 @@ class IssuedCertificateValidatorTest {
     }
 
     @Test void rejectsMismatchedPrivateKey() throws Exception {
-        Fixture fixture = Fixture.valid(NOW, List.of("maicraft.tech", "*.maicraft.tech"));
+        Fixture fixture = Fixture.valid(NOW, List.of("mydomain.com", "*.mydomain.com"));
         KeyPair unrelated = ecKeyPair();
         var material = new AcmeIssuanceService.IssuedMaterial(AcmeEnvironment.PRODUCTION,
                 fixture.fullChainPem, unrelated.getPrivate().getEncoded(), fixture.domains);
@@ -105,7 +105,7 @@ class IssuedCertificateValidatorTest {
     }
 
     @Test void rejectsRootFirstPemEvenWhenPkixCouldBuildTheChain() throws Exception {
-        Fixture fixture = Fixture.valid(NOW, List.of("maicraft.tech", "*.maicraft.tech"));
+        Fixture fixture = Fixture.valid(NOW, List.of("mydomain.com", "*.mydomain.com"));
         StringWriter reversed = new StringWriter();
         try (JcaPEMWriter writer = new JcaPEMWriter(reversed)) {
             writer.writeObject(fixture.rootCertificate);
@@ -122,7 +122,7 @@ class IssuedCertificateValidatorTest {
 
     @Test void rejectsExpiredLeafAtInjectedClock() throws Exception {
         Fixture fixture = Fixture.create(NOW.minusSeconds(172800), NOW.minusSeconds(86400),
-                List.of("maicraft.tech", "*.maicraft.tech"));
+                List.of("mydomain.com", "*.mydomain.com"));
 
         assertThrows(CertificateException.class,
                 () -> fixture.validator().validateForDeployment(fixture.material(AcmeEnvironment.PRODUCTION), config()));

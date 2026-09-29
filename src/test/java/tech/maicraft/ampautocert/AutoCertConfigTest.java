@@ -18,11 +18,11 @@ class AutoCertConfigTest {
         assertFalse(cfg.allowStagingIssuance());
         assertFalse(cfg.debugMode());
         assertEquals(30, cfg.renewBeforeDays());
-        assertTrue(cfg.domains().contains("*.maicraft.tech"));
-        assertEquals("maicraft.tech", cfg.zoneName());
-        assertEquals("_acme-challenge.maicraft.tech", cfg.challengeRecord());
-        assertEquals("hm.maicraft.tech:25598", cfg.minecraftSrvTarget());
-        assertEquals("hm.maicraft.tech:25809", cfg.modpackEndpoint());
+        assertTrue(cfg.domains().contains("*.mydomain.com"));
+        assertEquals("mydomain.com", cfg.zoneName());
+        assertEquals("_acme-challenge.mydomain.com", cfg.challengeRecord());
+        assertEquals("host.mydomain.com:25565", cfg.minecraftSrvTarget());
+        assertEquals("host.mydomain.com:25570", cfg.modpackEndpoint());
         assertEquals(30, cfg.acmeNetworkTimeoutSeconds());
         assertEquals(120, cfg.dnsPropagationTimeoutSeconds());
         assertEquals(15, cfg.dnsPropagationInitialDelaySeconds());
@@ -45,19 +45,19 @@ class AutoCertConfigTest {
     }
 
     @Test void rejectsDomainOutsideFixedAllowlist() throws Exception {
-        assertConfigRejected(text -> text.replace("maicraft.tech,*.maicraft.tech", "maicraft.tech,evil.example"),
+        assertConfigRejected(text -> text.replace("mydomain.com,*.mydomain.com", "mydomain.com,evil.example"),
                 "acme.domains");
     }
 
     @Test void requiresWildcardAndApexPair() throws Exception {
-        assertConfigRejected(text -> text.replace("maicraft.tech,*.maicraft.tech", "*.maicraft.tech"),
+        assertConfigRejected(text -> text.replace("mydomain.com,*.mydomain.com", "*.mydomain.com"),
                 "acme.domains");
     }
 
     @Test void rejectsCrossZoneMinecraftHostnameAndEndpoint() throws Exception {
-        assertConfigRejected(text -> text.replace("play.maicraft.tech", "play.evil.example"),
+        assertConfigRejected(text -> text.replace("play.mydomain.com", "play.evil.example"),
                 "minecraft.hostname");
-        assertConfigRejected(text -> text.replace("hm.maicraft.tech:25809", "host.evil.example:443"),
+        assertConfigRejected(text -> text.replace("host.mydomain.com:25570", "host.evil.example:443"),
                 "automodpack.endpoint");
     }
 
@@ -170,7 +170,7 @@ class AutoCertConfigTest {
                                 "https://acme-staging-v02.api.letsencrypt.org/directory")
                         .replace("TEMP_DIRECTORY", "https://acme-v02.api.letsencrypt.org/directory"),
                 "staging/production");
-        assertConfigRejected(text -> text.replace("play.maicraft.tech", "play.eu.maicraft.tech"),
+        assertConfigRejected(text -> text.replace("play.mydomain.com", "play.eu.mydomain.com"),
                 "exactly one label");
     }
 
@@ -178,17 +178,17 @@ class AutoCertConfigTest {
         AutoCertConfig.load(root);
         Path file = root.resolve("automodpack/amp-autocert.properties");
         String custom = Files.readString(file)
-                .replace("admin@maicraft.tech", "ops@example.net")
-                .replace("maicraft.tech", "example.net")
-                .replace("hm.example.net:25598", "origin.example.net:25565")
-                .replace("hm.example.net:25809", "packs.example.net:24443");
+                .replace("admin@mydomain.com", "ops@example.net")
+                .replace("mydomain.com", "example.net")
+                .replace("host.example.net:25565", "origin.example.net:25599")
+                .replace("host.example.net:25570", "packs.example.net:24443");
         Files.writeString(file, custom);
 
         AutoCertConfig cfg = AutoCertConfig.load(root);
 
         assertEquals("example.net", cfg.zoneName());
         assertEquals(List.of("example.net", "*.example.net"), cfg.domains());
-        assertEquals("origin.example.net:25565", cfg.minecraftSrvTarget());
+        assertEquals("origin.example.net:25599", cfg.minecraftSrvTarget());
         assertEquals("packs.example.net:24443", cfg.modpackEndpoint());
     }
 

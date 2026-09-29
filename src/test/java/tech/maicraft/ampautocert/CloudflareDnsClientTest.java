@@ -14,7 +14,7 @@ class CloudflareDnsClientTest {
     private static final String ZONE = "0123456789abcdef0123456789abcdef";
     private static final String TOKEN = "fake-token-never-log";
     private static final String VALUE = "abcdefghijklmnopqrstuvwxyz0123456789_-ABCDE";
-    private static final String RECORD = "_acme-challenge.maicraft.tech";
+    private static final String RECORD = "_acme-challenge.mydomain.com";
     private static final String MARKER = "amp-autocert:12345678-1234-4234-8234-123456789abc";
 
     @Test void createsOnlyAllowedTxtAndReturnsProviderId() throws Exception {

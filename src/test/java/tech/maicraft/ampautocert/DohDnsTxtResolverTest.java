@@ -15,7 +15,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class DohDnsTxtResolverTest {
-    private static final String RECORD = "_acme-challenge.maicraft.tech";
+    private static final String RECORD = "_acme-challenge.mydomain.com";
     private static final String SECRET_VALUE = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private static final List<URI> ENDPOINTS = List.of(
             URI.create("https://cloudflare-dns.com/dns-query"), URI.create("https://dns.google/resolve"));
@@ -23,7 +23,7 @@ class DohDnsTxtResolverTest {
 
     @Test void requiresConsensusAndDecodesQuotedTxtWithoutLoggingValues() throws Exception {
         FakeHttp http = new FakeHttp();
-        String body = success("_acme-challenge.maicraft.tech.", "\"aaaaaaaaaaaaaaaaaaaa\" \"aaaaaaaaaaaaaaaaaaaaaaa\"");
+        String body = success("_acme-challenge.mydomain.com.", "\"aaaaaaaaaaaaaaaaaaaa\" \"aaaaaaaaaaaaaaaaaaaaaaa\"");
         http.responses.put("cloudflare-dns.com", new HttpTransport.Response(200, body));
         http.responses.put("dns.google", new HttpTransport.Response(200, body));
         List<String> diagnostics = new ArrayList<>();
@@ -63,7 +63,7 @@ class DohDnsTxtResolverTest {
 
     @Test void ignoresAnswersForOtherOwnersAndRecordTypes() throws Exception {
         String body = "{\"Status\":0,\"Answer\":["
-                + "{\"name\":\"other.maicraft.tech.\",\"type\":16,\"data\":\"\\\"" + SECRET_VALUE + "\\\"\"},"
+                + "{\"name\":\"other.mydomain.com.\",\"type\":16,\"data\":\"\\\"" + SECRET_VALUE + "\\\"\"},"
                 + "{\"name\":\"" + RECORD + ".\",\"type\":1,\"data\":\"\\\"" + SECRET_VALUE + "\\\"\"}]}";
         FakeHttp http = new FakeHttp();
         http.responses.put("cloudflare-dns.com", new HttpTransport.Response(200, body));

@@ -69,6 +69,6 @@ class StagingIssuanceProbeTest {
 
     private static AcmeIssuanceService.IssuedMaterial material(AcmeEnvironment environment) {
         return new AcmeIssuanceService.IssuedMaterial(environment, "redacted fixture", new byte[] {1},
-                List.of("maicraft.tech", "*.maicraft.tech"));
+                List.of("mydomain.com", "*.mydomain.com"));
     }
 }

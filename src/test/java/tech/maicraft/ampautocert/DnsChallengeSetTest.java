@@ -11,7 +11,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class DnsChallengeSetTest {
-    private static final String RECORD = "_acme-challenge.maicraft.tech";
+    private static final String RECORD = "_acme-challenge.mydomain.com";
     private static final List<String> VALUES = List.of(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");

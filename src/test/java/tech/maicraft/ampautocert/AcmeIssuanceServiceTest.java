@@ -25,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class AcmeIssuanceServiceTest {
     private static final String APEX = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private static final String WILDCARD = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    private static final String RECORD = "_acme-challenge.maicraft.tech";
-    private static final List<String> DOMAINS = List.of("maicraft.tech", "*.maicraft.tech");
+    private static final String RECORD = "_acme-challenge.mydomain.com";
+    private static final List<String> DOMAINS = List.of("mydomain.com", "*.mydomain.com");
 
     @Test void fakeEndToEndIssuancePublishesBothValuesThenCleansThem() throws Exception {
         Fixture fixture = new Fixture();
@@ -34,7 +34,7 @@ class AcmeIssuanceServiceTest {
         AcmeIssuanceService.IssuedMaterial result = fixture.service().issue(AcmeEnvironment.STAGING, "ops@example.test");
 
         assertEquals(AcmeEnvironment.STAGING, result.environment());
-        assertEquals(List.of("maicraft.tech", "*.maicraft.tech"), result.domains());
+        assertEquals(List.of("mydomain.com", "*.mydomain.com"), result.domains());
         assertTrue(result.fullChainPem().contains("BEGIN CERTIFICATE"));
         assertTrue(result.privateKeyPkcs8().length > 0);
         assertTrue(fixture.dns.active.isEmpty());
@@ -122,7 +122,7 @@ class AcmeIssuanceServiceTest {
     @Test void rejectsUnexpectedChallengeBeforeAnyDnsMutation() {
         Fixture fixture = new Fixture();
         fixture.gateway.challenges = List.of(
-                new AcmeGateway.DnsChallenge("maicraft.tech", RECORD, APEX),
+                new AcmeGateway.DnsChallenge("mydomain.com", RECORD, APEX),
                 new AcmeGateway.DnsChallenge("evil.example", "_acme-challenge.evil.example", WILDCARD));
 
         assertThrows(IllegalArgumentException.class,
@@ -152,7 +152,7 @@ class AcmeIssuanceServiceTest {
     @Test void oneReusedAuthorizationPublishesOnlyThePendingChallenge() throws Exception {
         Fixture fixture = new Fixture();
         fixture.gateway.challenges = List.of(
-                new AcmeGateway.DnsChallenge("*.maicraft.tech", RECORD, WILDCARD));
+                new AcmeGateway.DnsChallenge("*.mydomain.com", RECORD, WILDCARD));
 
         fixture.service().issue(AcmeEnvironment.STAGING, "ops@example.test");
 
@@ -163,8 +163,8 @@ class AcmeIssuanceServiceTest {
     @Test void acceptsAcmeAbsoluteDnsOwnerAndKeepsCanonicalConfiguredOwner() throws Exception {
         Fixture fixture = new Fixture();
         fixture.gateway.challenges = List.of(
-                new AcmeGateway.DnsChallenge("maicraft.tech", RECORD + ".", APEX),
-                new AcmeGateway.DnsChallenge("*.maicraft.tech", RECORD + ".", WILDCARD));
+                new AcmeGateway.DnsChallenge("mydomain.com", RECORD + ".", APEX),
+                new AcmeGateway.DnsChallenge("*.mydomain.com", RECORD + ".", WILDCARD));
 
         fixture.service().issue(AcmeEnvironment.STAGING, "ops@example.test");
 
@@ -259,24 +259,24 @@ class AcmeIssuanceServiceTest {
         AcmeIssuanceService service() { return service(Duration.ofMinutes(2)); }
         AcmeIssuanceService service(Duration timeout) {
             return new AcmeIssuanceService(state, state, gateway, dns, resolver, clock, sleeper,
-                    "maicraft.tech", DOMAINS, RECORD, timeout,
+                    "mydomain.com", DOMAINS, RECORD, timeout,
                     () -> "12345678-1234-4234-8234-123456789abc");
         }
         AcmeIssuanceService service(Duration timeout, boolean debugMode,
                                     java.util.function.Consumer<String> diagnostics) {
             return new AcmeIssuanceService(state, state, gateway, dns, resolver, clock, sleeper,
-                    "maicraft.tech", DOMAINS, RECORD, timeout, debugMode, diagnostics,
+                    "mydomain.com", DOMAINS, RECORD, timeout, debugMode, diagnostics,
                     () -> "12345678-1234-4234-8234-123456789abc");
         }
         AcmeIssuanceService service(Duration timeout, Duration initialDelay, boolean debugMode,
                                     java.util.function.Consumer<String> diagnostics) {
             return new AcmeIssuanceService(state, state, gateway, dns, resolver, clock, sleeper,
-                    "maicraft.tech", DOMAINS, RECORD, timeout, initialDelay, debugMode, diagnostics,
+                    "mydomain.com", DOMAINS, RECORD, timeout, initialDelay, debugMode, diagnostics,
                     () -> "12345678-1234-4234-8234-123456789abc");
         }
         IssuanceTransaction pending(List<String> ids) {
             return new IssuanceTransaction(AcmeEnvironment.STAGING,
-                    "12345678-1234-4234-8234-123456789abc", "maicraft.tech",
+                    "12345678-1234-4234-8234-123456789abc", "mydomain.com",
                     URI.create("https://acme-staging-v02.api.letsencrypt.org/acme/acct/1"),
                     URI.create("https://acme-staging-v02.api.letsencrypt.org/acme/order/1/1"),
                     IssuanceTransaction.Phase.PREPARED, gateway.challenges, ids);
@@ -314,13 +314,13 @@ class AcmeIssuanceServiceTest {
     private static final class FakeGateway implements AcmeGateway, AcmeGateway.Order {
         final List<String> events = new ArrayList<>();
         List<DnsChallenge> challenges = List.of(
-                new DnsChallenge("maicraft.tech", RECORD, APEX),
-                new DnsChallenge("*.maicraft.tech", RECORD, WILDCARD));
+                new DnsChallenge("mydomain.com", RECORD, APEX),
+                new DnsChallenge("*.mydomain.com", RECORD, WILDCARD));
         boolean failFinalize;
         @Override public Order openOrder(AcmeEnvironment environment, String email, KeyPair key,
                                          Optional<URI> account, List<String> domains) {
             events.add("open");
-            assertEquals(List.of("maicraft.tech", "*.maicraft.tech"), domains);
+            assertEquals(List.of("mydomain.com", "*.mydomain.com"), domains);
             return this;
         }
         @Override public URI accountLocation() { return URI.create("https://acme-staging-v02.api.letsencrypt.org/acme/acct/1"); }

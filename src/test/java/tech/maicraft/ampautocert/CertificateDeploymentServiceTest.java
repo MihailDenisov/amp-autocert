@@ -230,13 +230,13 @@ class CertificateDeploymentServiceTest {
     private static CertificateDeploymentService.MaterialValidator valid() {
         return material -> new IssuedCertificateValidator.ValidationResult(
                 Instant.parse("2026-09-27T00:00:00Z"), Instant.parse("2026-12-26T00:00:00Z"),
-                List.of("maicraft.tech", "*.maicraft.tech"));
+                List.of("mydomain.com", "*.mydomain.com"));
     }
 
     private static AcmeIssuanceService.IssuedMaterial material() {
         return new AcmeIssuanceService.IssuedMaterial(AcmeEnvironment.PRODUCTION,
                 "NEW CERTIFICATE\n", new byte[]{1, 2, 3, 4},
-                List.of("maicraft.tech", "*.maicraft.tech"));
+                List.of("mydomain.com", "*.mydomain.com"));
     }
 
     private void writeExistingPair() throws IOException {

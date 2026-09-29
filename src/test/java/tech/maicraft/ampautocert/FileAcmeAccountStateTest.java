@@ -81,11 +81,11 @@ class FileAcmeAccountStateTest {
     @Test void persistsAndClearsEnvironmentSeparatedIssuanceJournal() throws Exception {
         FileAcmeAccountState state = state();
         IssuanceTransaction transaction = new IssuanceTransaction(AcmeEnvironment.STAGING,
-                "12345678-1234-4234-8234-123456789abc", "maicraft.tech",
+                "12345678-1234-4234-8234-123456789abc", "mydomain.com",
                 URI.create("https://acme-staging-v02.api.letsencrypt.org/acme/acct/1"),
                 URI.create("https://acme-staging-v02.api.letsencrypt.org/acme/order/1/2"),
                 IssuanceTransaction.Phase.DNS_PUBLISHED,
-                List.of(new AcmeGateway.DnsChallenge("maicraft.tech", "_acme-challenge.maicraft.tech",
+                List.of(new AcmeGateway.DnsChallenge("mydomain.com", "_acme-challenge.mydomain.com",
                         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")),
                 List.of("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
 

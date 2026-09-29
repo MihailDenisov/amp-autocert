@@ -18,7 +18,7 @@ class OperatorStatusTest {
 
     @Test void formatsRequiredOperatorFieldsWithoutSecretMaterial() {
         OperatorStatus status = new OperatorStatus(true, Optional.of(AcmeEnvironment.PRODUCTION), "running",
-                Optional.of(NOW.plusSeconds(31L * 86400)), List.of("*.maicraft.tech", "maicraft.tech"),
+                Optional.of(NOW.plusSeconds(31L * 86400)), List.of("*.mydomain.com", "mydomain.com"),
                 Optional.of(NOW), "not_due", Optional.empty());
 
         List<String> lines = status.format(CLOCK);
@@ -26,7 +26,7 @@ class OperatorStatusTest {
         assertEquals(4, lines.size());
         assertTrue(lines.get(0).contains("environment=production"));
         assertTrue(lines.get(1).contains("31 days left"));
-        assertTrue(lines.get(2).contains("*.maicraft.tech, maicraft.tech"));
+        assertTrue(lines.get(2).contains("*.mydomain.com, mydomain.com"));
         assertTrue(lines.get(3).contains("outcome: not_due"));
         assertFalse(String.join(" ", lines).toLowerCase().contains("token"));
         assertFalse(String.join(" ", lines).toLowerCase().contains("private key"));

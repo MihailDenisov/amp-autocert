@@ -32,3 +32,4 @@ CODEX_TASK.md
 docs/IMPLEMENTATION_LOG.md
 # Local full-project backups must never be published.
 amp-autocert-backup.zip
+.vscode/

@@ -1,29 +1,31 @@
 # amp-autocert
 
-Starter VS Code project for a **server-only** Minecraft **1.21.1** mod on **NeoForge 21.1.248**, using **Java 21**. Intended outcome: manage public Let's Encrypt certificates for AutoModpack via Cloudflare DNS-01 without OS-level Certbot or cron.
+[Русская версия](README_RU.md)
+
+**Server-only** Minecraft **1.21.1** mod on **NeoForge 21.1.248**, built with **Java 21**. It manages public Let's Encrypt certificates for AutoModpack via Cloudflare DNS-01 without OS-level Certbot or cron.
 
 > **Status: PRODUCTION PIPELINE VALIDATED.** On 2026-09-29 the operator completed live Let's Encrypt production issuance for the configured apex/wildcard pair, Cloudflare DNS-01 cleanup, crash-safe credential replacement, and activation through AutoModpack 5.0.0-rc.2. A restart retained the deployed certificate, `/ampautocert check` reported `VALID/not_due` with the expected SANs, and a client connected without manually entering a fingerprint. Fresh installations still default to disabled staging mode and must follow the production runbook.
 
-## Open in VS Code
+## Build and open in VS Code
 
-1. Install **JDK 21**, Visual Studio Code, and the Java/Gradle extensions suggested in `.vscode/extensions.json`.
-2. Extract this archive and open the **`amp-autocert/` project folder**, not its parent.
-3. Run the VS Code task **Gradle: test** or `./gradlew test` (Windows: `gradlew.bat test`). On first run, the supplied launcher downloads the **official Gradle 8.14.3 wrapper JAR** and verifies its published SHA-256; Gradle downloads NeoForge dependencies. Internet access is required for the first full build. The starter intentionally does not ship an unverified binary wrapper.
-4. Run the offline Java-only check anytime: `sh scripts/offline-smoke-test.sh` (requires JDK 21 and POSIX shell). VS Code's default build task runs `./gradlew build`.
-5. This repository publishes only the mod itself. Codex/agent workflow files (`AGENTS.md`, `CODEX_TASK.md`, `.codex/`, `.agents/`, `docs/IMPLEMENTATION_LOG.md`) are intentionally excluded via `.gitignore` and are not part of the public repo.
+1. Install **JDK 21**. For VS Code, also install the **Extension Pack for Java** and **Gradle for Java** extensions.
+2. Clone this repository: `git clone https://github.com/MihailDenisov/amp-autocert.git`, then open the project folder.
+3. Run `./gradlew test` (Windows: `gradlew.bat test`). On first run, the supplied launcher downloads the **official Gradle 8.14.3 wrapper JAR** and verifies its published SHA-256; Gradle downloads NeoForge dependencies. Internet access is required for the first full build. The project intentionally does not ship an unverified binary wrapper.
+4. Run the offline Java-only check anytime: `sh scripts/offline-smoke-test.sh` (requires JDK 21 and POSIX shell). Build the mod JAR with `./gradlew build`; the result lands in `build/libs/`.
+5. This repository publishes only the mod itself. Codex/agent workflow files (`AGENTS.md`, `CODEX_TASK.md`, `.codex/`, `.agents/`, `docs/IMPLEMENTATION_LOG.md`) and editor settings (`.vscode/`) are intentionally excluded via `.gitignore` and are not part of the public repo.
 
 ## Your topology
 
 | Service | Name / port |
 | --- | --- |
-| Minecraft join hostname | `play.maicraft.tech` |
-| DNS A record | `hm.maicraft.tech` -> actual public IP, Cloudflare DNS only |
-| Minecraft SRV | `_minecraft._tcp.play.maicraft.tech` -> `hm.maicraft.tech:25598` |
-| AutoModpack endpoint | `hm.maicraft.tech:25809` |
-| Requested Let's Encrypt SANs | `maicraft.tech`, `*.maicraft.tech` |
+| Minecraft join hostname | `play.mydomain.com` |
+| DNS A record | `host.mydomain.com` -> actual public IP, Cloudflare DNS only |
+| Minecraft SRV | `_minecraft._tcp.play.mydomain.com` -> `host.mydomain.com:25565` |
+| AutoModpack endpoint | `host.mydomain.com:25570` |
+| Requested Let's Encrypt SANs | `mydomain.com`, `*.mydomain.com` |
 | DNS validation | Cloudflare API, DNS-01; no DNSSEC required |
 
-Cloudflare **Origin CA is not sufficient** for direct Minecraft clients; use Let's Encrypt or another publicly trusted CA. Wildcard `*.maicraft.tech` covers both `play` and `hm` hostnames.
+Cloudflare **Origin CA is not sufficient** for direct Minecraft clients; use Let's Encrypt or another publicly trusted CA. Wildcard `*.mydomain.com` covers both the `play` and `host` hostnames.
 
 ## Server configuration
 
@@ -80,10 +82,10 @@ from the short configuration notes alone.
 | `.../AutoModpackHostControl.java` | version-pinned server-thread restart/readiness adapter |
 | `.../CloudflareCredentialSource.java` | env/private-file token lookup |
 | `src/test/` | initial JUnit tests |
-| `START_HERE_RU.md` | Russian quick-start overview |
+| `README_RU.md` | Russian version of this README |
 
 ## Validation boundaries
 
 The workspace has deterministic fake coverage for the connected coordinator, persisted issuance cooldown, DNS cleanup, certificate validation, deployment, activation, rollback, and two-phase crash recovery. The operator additionally completed the live production flow described above on the target NeoForge/AutoModpack server. That one successful deployment does not replace regression tests or prove every provider failure and crash boundary in production. No user API keys, real certificates, ACME account state, or other runtime secrets are embedded in the repository or release JAR.
 
-References: [NeoForge 1.21.1](https://docs.neoforged.net/docs/1.21.1/gettingstarted/) · [AutoModpack security](https://moddedmc.wiki/en/project/automodpack/latest/docs/security) · [acme4j](https://github.com/shred/acme4j) · [Codex subagents](https://developers.openai.com/codex/subagents) · [Codex skills](https://developers.openai.com/codex/skills).
+References: [NeoForge 1.21.1](https://docs.neoforged.net/docs/1.21.1/gettingstarted/) · [AutoModpack security](https://moddedmc.wiki/en/project/automodpack/latest/docs/security) · [acme4j](https://github.com/shred/acme4j).

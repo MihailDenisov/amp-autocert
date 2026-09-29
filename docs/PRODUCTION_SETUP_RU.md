@@ -30,14 +30,14 @@ AutoModpack 5.0.0-rc.2, сохранение сертификата после �
 
 ## 1. Требования к DNS и сети
 
-- `play.maicraft.tech` — адрес, который вводят игроки.
-- `_minecraft._tcp.play.maicraft.tech` указывает на `hm.maicraft.tech:25598`.
-- `hm.maicraft.tech` резолвится напрямую в публичный адрес Minecraft-сервера.
-- AutoModpack объявляет endpoint `hm.maicraft.tech:25809`.
-- Сертификат содержит `maicraft.tech` и `*.maicraft.tech`; wildcard покрывает
-  и `play.maicraft.tech`, и `hm.maicraft.tech`.
+- `play.mydomain.com` — адрес, который вводят игроки.
+- `_minecraft._tcp.play.mydomain.com` указывает на `host.mydomain.com:25565`.
+- `host.mydomain.com` резолвится напрямую в публичный адрес Minecraft-сервера.
+- AutoModpack объявляет endpoint `host.mydomain.com:25570`.
+- Сертификат содержит `mydomain.com` и `*.mydomain.com`; wildcard покрывает
+  и `play.mydomain.com`, и `host.mydomain.com`.
 
-Записи A/AAAA для `hm.maicraft.tech` держите в режиме **DNS only** (серое
+Записи A/AAAA для `host.mydomain.com` держите в режиме **DNS only** (серое
 облако). HTTP-прокси Cloudflare не является прозрачным прокси для порта
 Minecraft и TCP-endpoint AutoModpack. Удалите устаревшую AAAA-запись, если
 сервер фактически недоступен по IPv6. DNSSEC для DNS-01 не требуется.
@@ -47,7 +47,7 @@ Minecraft и TCP-endpoint AutoModpack. Удалите устаревшую AAAA-
 Создайте в Cloudflare отдельный custom API token:
 
 - разрешение: `Zone / DNS / Edit`;
-- ресурс: только конкретная зона `maicraft.tech`;
+- ресурс: только конкретная зона `mydomain.com`;
 - никакого доступа ко всему аккаунту или другим зонам.
 
 Ограничение по IP клиента полезно только при стабильном исходящем публичном
@@ -97,15 +97,15 @@ enabled=false
 debugmode=false
 acme.environment=staging
 acme.allowStagingIssuance=false
-acme.domains=maicraft.tech,*.maicraft.tech
-dns.zoneName=maicraft.tech
-dns.challengeRecord=_acme-challenge.maicraft.tech
+acme.domains=mydomain.com,*.mydomain.com
+dns.zoneName=mydomain.com
+dns.challengeRecord=_acme-challenge.mydomain.com
 dns.propagationInitialDelaySeconds=15
 dns.dohResolvers=https://cloudflare-dns.com/dns-query,https://dns.google/resolve
 cloudflare.zoneId=YOUR_ZONE_ID
-minecraft.hostname=play.maicraft.tech
-minecraft.srvTarget=hm.maicraft.tech:25598
-automodpack.endpoint=hm.maicraft.tech:25809
+minecraft.hostname=play.mydomain.com
+minecraft.srvTarget=host.mydomain.com:25565
+automodpack.endpoint=host.mydomain.com:25570
 host.restartAfterRenew=true
 ```
 
@@ -260,7 +260,7 @@ fingerprint только когда сертификат покрывает ис
 | `host.restartAfterRenew=false` | Устанавливайте `true` только после принятия интеграции перезапуска/готовности. |
 | Действует production-cooldown | Ждите, пока `/ampautocert status` не покажет время следующей попытки; перезапуски и повторные команды его не сбрасывают. |
 | Таймаут распространения DNS | Проверьте авторитетные серверы Cloudflare, точный zone ID, область токена и записи `_acme-challenge`. Не добавляйте постоянные TXT-записи как обходной путь. |
-| Таймаут активации/готовности | Убедитесь, что внутренний TLS AutoModpack включён, порт 25809 настроен и endpoint не занят другим процессом. Старая пара должна сохраниться или быть восстановлена. |
+| Таймаут активации/готовности | Убедитесь, что внутренний TLS AutoModpack включён, порт 25570 настроен и endpoint не занят другим процессом. Старая пара должна сохраниться или быть восстановлена. |
 | Сертификат всё ещё выглядит самоподписанным | Сначала проверьте статус и лог сервера. Не перезаписывайте только один файл из пары. Убедитесь, что клиенты достигают настроенного endpoint AutoModpack. |
 | Клиент сообщает о несовпадении fingerprint | Удаляйте старый ручной pin клиента только после независимой проверки сервера и нового публичного сертификата. |
 

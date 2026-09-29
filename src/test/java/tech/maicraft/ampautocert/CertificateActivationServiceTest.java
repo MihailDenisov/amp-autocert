@@ -327,7 +327,7 @@ class CertificateActivationServiceTest {
 
     private static Fixture fixture() throws Exception {
         var fixture = IssuedCertificateValidatorTest.Fixture.valid(NOW,
-                List.of("maicraft.tech", "*.maicraft.tech"));
+                List.of("mydomain.com", "*.mydomain.com"));
         String fingerprint = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                 .digest(fixture.leafCertificate.getEncoded()));
         return new Fixture(fixture.material(AcmeEnvironment.PRODUCTION), fingerprint);

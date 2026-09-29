@@ -11,14 +11,14 @@ its own controlled rollout; production mode is never enabled by default.
 
 ## 1. DNS and network prerequisites
 
-- `play.maicraft.tech` is the address players type.
-- `_minecraft._tcp.play.maicraft.tech` points to `hm.maicraft.tech:25598`.
-- `hm.maicraft.tech` resolves directly to the Minecraft server's public address.
-- AutoModpack advertises `hm.maicraft.tech:25809`.
-- The certificate contains `maicraft.tech` and `*.maicraft.tech`; the wildcard
-  covers both `play.maicraft.tech` and `hm.maicraft.tech`.
+- `play.mydomain.com` is the address players type.
+- `_minecraft._tcp.play.mydomain.com` points to `host.mydomain.com:25565`.
+- `host.mydomain.com` resolves directly to the Minecraft server's public address.
+- AutoModpack advertises `host.mydomain.com:25570`.
+- The certificate contains `mydomain.com` and `*.mydomain.com`; the wildcard
+  covers both `play.mydomain.com` and `host.mydomain.com`.
 
-Keep the `hm.maicraft.tech` A/AAAA records **DNS only** (grey cloud). Cloudflare's
+Keep the `host.mydomain.com` A/AAAA records **DNS only** (grey cloud). Cloudflare's
 HTTP proxy is not a transparent proxy for the Minecraft port or this
 AutoModpack TCP endpoint. Remove an obsolete AAAA record if the server is not
 actually reachable over IPv6. DNSSEC is not required for DNS-01.
@@ -28,7 +28,7 @@ actually reachable over IPv6. DNSSEC is not required for DNS-01.
 Create a dedicated custom API token in Cloudflare with:
 
 - permission: `Zone / DNS / Edit`;
-- zone resource: include only the specific `maicraft.tech` zone;
+- zone resource: include only the specific `mydomain.com` zone;
 - no account-wide or unrelated-zone access.
 
 An optional client-IP restriction is useful only when the game server has a
@@ -79,15 +79,15 @@ enabled=false
 debugmode=false
 acme.environment=staging
 acme.allowStagingIssuance=false
-acme.domains=maicraft.tech,*.maicraft.tech
-dns.zoneName=maicraft.tech
-dns.challengeRecord=_acme-challenge.maicraft.tech
+acme.domains=mydomain.com,*.mydomain.com
+dns.zoneName=mydomain.com
+dns.challengeRecord=_acme-challenge.mydomain.com
 dns.propagationInitialDelaySeconds=15
 dns.dohResolvers=https://cloudflare-dns.com/dns-query,https://dns.google/resolve
 cloudflare.zoneId=YOUR_ZONE_ID
-minecraft.hostname=play.maicraft.tech
-minecraft.srvTarget=hm.maicraft.tech:25598
-automodpack.endpoint=hm.maicraft.tech:25809
+minecraft.hostname=play.mydomain.com
+minecraft.srvTarget=host.mydomain.com:25565
+automodpack.endpoint=host.mydomain.com:25570
 host.restartAfterRenew=true
 ```
 
@@ -230,7 +230,7 @@ the migration; certificate renewal cannot silently override it.
 | `host.restartAfterRenew=false` | Set it to `true` only after restart/readiness integration has been accepted. |
 | Production cooldown active | Wait until `/ampautocert status` reports the next allowed attempt; restarts and repeated commands do not clear it. |
 | DNS propagation timeout | Check authoritative Cloudflare nameservers, the exact zone ID, token scope, and `_acme-challenge` records. Do not add permanent TXT values as a workaround. |
-| Activation/readiness timeout | Confirm AutoModpack internal TLS is enabled, port 25809 is configured, and no other process owns the endpoint. The old pair should remain or be restored. |
+| Activation/readiness timeout | Confirm AutoModpack internal TLS is enabled, port 25570 is configured, and no other process owns the endpoint. The old pair should remain or be restored. |
 | Certificate still appears self-signed | Check the status outcome and server log first. Do not overwrite only one credential file. Confirm clients reach the configured AutoModpack endpoint. |
 | Existing client reports fingerprint mismatch | Remove that client's old manual pin only after independently verifying the server and new public certificate. |
 

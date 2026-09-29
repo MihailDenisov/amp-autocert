@@ -99,7 +99,7 @@ class RenewalCoordinatorTest {
         RenewalCoordinator coordinator = coordinator(productionConfig(), Optional.of(NOW.plusSeconds(86400)),
                 (environment, email) -> {
                     assertEquals(AcmeEnvironment.PRODUCTION, environment);
-                    assertEquals("admin@maicraft.tech", email);
+                    assertEquals("admin@mydomain.com", email);
                     issued.incrementAndGet();
                     return material();
                 }, ignored -> { activated.incrementAndGet(); return activated(); });
@@ -225,7 +225,7 @@ class RenewalCoordinatorTest {
 
     private static AcmeIssuanceService.IssuedMaterial material() {
         return new AcmeIssuanceService.IssuedMaterial(AcmeEnvironment.PRODUCTION,
-                "fixture", new byte[]{1}, List.of("maicraft.tech", "*.maicraft.tech"));
+                "fixture", new byte[]{1}, List.of("mydomain.com", "*.mydomain.com"));
     }
 
     private static CertificateActivationService.ActivationResult activated() {

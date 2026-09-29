@@ -19,10 +19,10 @@ import static org.junit.jupiter.api.Assertions.*;
 class Acme4jGatewayTest {
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-09-27T00:00:00Z"), ZoneOffset.UTC);
     private static final Instant DEADLINE = Instant.parse("2026-09-27T00:05:00Z");
-    private static final List<String> DOMAINS = List.of("maicraft.tech", "*.maicraft.tech");
+    private static final List<String> DOMAINS = List.of("mydomain.com", "*.mydomain.com");
     private static final URI STAGING = URI.create("https://acme-staging-v02.api.letsencrypt.org/directory");
     private static final URI PRODUCTION = URI.create("https://acme-v02.api.letsencrypt.org/directory");
-    private static final String RECORD = "_acme-challenge.maicraft.tech";
+    private static final String RECORD = "_acme-challenge.mydomain.com";
 
     @Test void delegatesCompleteProductionGatewayFlow() throws Exception {
         FakeClient client = new FakeClient();
@@ -135,7 +135,7 @@ class Acme4jGatewayTest {
 
     private static final class FakeRemoteOrder implements Acme4jClient.RemoteOrder {
         final List<AcmeGateway.DnsChallenge> challenges = List.of(
-                new AcmeGateway.DnsChallenge("maicraft.tech", RECORD,
+                new AcmeGateway.DnsChallenge("mydomain.com", RECORD,
                         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
         boolean triggered;
         Instant readyDeadline;
