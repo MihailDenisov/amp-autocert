@@ -10,7 +10,7 @@ Starter VS Code project for a **server-only** Minecraft **1.21.1** mod on **NeoF
 2. Extract this archive and open the **`amp-autocert/` project folder**, not its parent.
 3. Run the VS Code task **Gradle: test** or `./gradlew test` (Windows: `gradlew.bat test`). On first run, the supplied launcher downloads the **official Gradle 8.14.3 wrapper JAR** and verifies its published SHA-256; Gradle downloads NeoForge dependencies. Internet access is required for the first full build. The starter intentionally does not ship an unverified binary wrapper.
 4. Run the offline Java-only check anytime: `sh scripts/offline-smoke-test.sh` (requires JDK 21 and POSIX shell). VS Code's default build task runs `./gradlew build`.
-5. Open Codex in this repository. The root `AGENTS.md`, `.codex/config.toml`, `.codex/agents/` and `.agents/skills/` provide task context, budgeted subagents, security boundaries and reusable workflows. Paste the English prompt in `CODEX_TASK.md` §4 into Codex.
+5. This repository publishes only the mod itself. Codex/agent workflow files (`AGENTS.md`, `CODEX_TASK.md`, `.codex/`, `.agents/`, `docs/IMPLEMENTATION_LOG.md`) are intentionally excluded via `.gitignore` and are not part of the public repo.
 
 ## Your topology
 
@@ -59,7 +59,8 @@ All commands inherit the parent permission-level-3 requirement. The permission p
 
 The complete preparation, restricted Cloudflare token, backup, staging-to-production,
 rotation, rollback, fingerprint-pin, and troubleshooting procedure is in
-[`docs/PRODUCTION_SETUP.md`](docs/PRODUCTION_SETUP.md). Do not enable production
+[`docs/PRODUCTION_SETUP.md`](docs/PRODUCTION_SETUP.md)
+([русская версия](docs/PRODUCTION_SETUP_RU.md)). Do not enable production
 from the short configuration notes alone.
 
 ## Project map
@@ -79,12 +80,7 @@ from the short configuration notes alone.
 | `.../AutoModpackHostControl.java` | version-pinned server-thread restart/readiness adapter |
 | `.../CloudflareCredentialSource.java` | env/private-file token lookup |
 | `src/test/` | initial JUnit tests |
-| `CODEX_TASK.md` | full **English** implementation brief and acceptance criteria |
-| `AGENTS.md` | root project policies for Codex |
-| `.codex/config.toml` | <= 2 subagents; cheap/fast model defaults (edit for availability) |
-| `.codex/agents/` | read-only fast scanner, log triage, focused security reviewer |
-| `.agents/skills/` | NeoForge, ACME/Cloudflare, TLS deployment, security, token-budget skills |
-| `docs/IMPLEMENTATION_LOG.md` | compact milestone handoff |
+| `START_HERE_RU.md` | Russian quick-start overview |
 
 ## Validation boundaries
 

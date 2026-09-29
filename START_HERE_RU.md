@@ -11,8 +11,7 @@
 1. Распакуй архив и открой папку `amp-autocert` в VS Code.
 2. Установи JDK 21 и предложенные VS Code расширения Java/Gradle.
 3. Запусти задачу `Gradle: test` или команду `./gradlew test` (`gradlew.bat test` на Windows). При первом запуске нужен Интернет: загрузятся проверенный официальный wrapper Gradle и зависимости NeoForge.
-4. Открой Codex в папке проекта. Он прочитает `AGENTS.md` и обнаружит навыки в `.agents/skills/`. Параметры дешёвых субагентов хранятся в `.codex/config.toml`. При отсутствии выбранной быстрой модели замени её на доступную в своём тарифе.
-5. Открой `CODEX_TASK.md` и отправь Codex задание из раздела 4. Сначала работа со staging, затем тесты и только потом production.
+4. Рабочие файлы Codex (`AGENTS.md`, `CODEX_TASK.md`, `.codex/`, `.agents/`, `docs/IMPLEMENTATION_LOG.md`) намеренно исключены через `.gitignore` и не публикуются в репозитории — это локальный рабочий контур разработки.
 
 Твои заранее указанные домены/порты внесены в конфигурацию-пример: `play.maicraft.tech` (через SRV на `hm.maicraft.tech:25598`), AutoModpack `hm.maicraft.tech:25809`, сертификат `maicraft.tech` + `*.maicraft.tech`. Публичный конфиг мода создаётся в `automodpack/amp-autocert.properties`. DNSSEC не нужен. Cloudflare Origin CA не подходит для прямого подключения клиентов — использовать публичный Let's Encrypt.
 
@@ -32,4 +31,4 @@
 
 В поддерживаемых AutoModpack rc.1/rc.2 используются `automodpack/credentials/certificate.crt` и `automodpack/credentials/private-key.pem`. В `automodpack/server.conf` добавь `automodpack/credentials/**` и `automodpack/amp-autocert.properties` в `exclude` каждого modpack group. Проверенный runtime не читает имя `certificate.cert`.
 
-Полная инструкция по подготовке Cloudflare, резервному копированию, переходу staging -> production, откату, fingerprint pins и диагностике находится в [`docs/PRODUCTION_SETUP.md`](docs/PRODUCTION_SETUP.md). Не включай production только по краткой памятке выше.
+Полная инструкция по подготовке Cloudflare, резервному копированию, переходу staging -> production, откату, fingerprint pins и диагностике находится в [`docs/PRODUCTION_SETUP_RU.md`](docs/PRODUCTION_SETUP_RU.md) (английская версия: [`docs/PRODUCTION_SETUP.md`](docs/PRODUCTION_SETUP.md)). Не включай production только по краткой памятке выше.

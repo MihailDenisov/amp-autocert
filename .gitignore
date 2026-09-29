@@ -24,3 +24,11 @@ gradle/wrapper/gradle-wrapper.jar
 .env
 .env.*
 automodpack/amp-autocert.properties
+# Agent/Codex workflow files: skills, agent configs, task briefs and implementation journals are local-only.
+.agents/
+.codex/
+AGENTS.md
+CODEX_TASK.md
+docs/IMPLEMENTATION_LOG.md
+# Local full-project backups must never be published.
+amp-autocert-backup.zip

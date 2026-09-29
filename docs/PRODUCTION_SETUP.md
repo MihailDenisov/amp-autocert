@@ -1,5 +1,7 @@
 # Production setup and recovery
 
+Русская версия этого руководства: [`PRODUCTION_SETUP_RU.md`](PRODUCTION_SETUP_RU.md).
+
 This runbook applies only to Minecraft 1.21.1, NeoForge 21.1.248, and inspected
 AutoModpack versions in `[5.0.0-rc.1,5.0.0-rc.2]`. The reference deployment
 completed live Let's Encrypt production issuance, Cloudflare DNS-01 cleanup,
