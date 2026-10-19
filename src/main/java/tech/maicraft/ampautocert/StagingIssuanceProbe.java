@@ -3,6 +3,7 @@ package tech.maicraft.ampautocert;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Clock;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -14,32 +15,52 @@ final class StagingIssuanceProbe {
     private final Clock clock;
     private final AttemptGate attemptGate;
     private final AtomicBoolean stopping;
+    private final DriftGate driftGate;
 
     StagingIssuanceProbe(AutoCertConfig config, Issuer issuer, Validator validator, Clock clock,
                          AttemptGate attemptGate, AtomicBoolean stopping) {
+        this(config, issuer, validator, clock, attemptGate, ConfigurationDriftGuard.Result::ready, stopping);
+    }
+
+    StagingIssuanceProbe(AutoCertConfig config, Issuer issuer, Validator validator, Clock clock,
+                         AttemptGate attemptGate, DriftGate driftGate, AtomicBoolean stopping) {
         this.config = config;
         this.issuer = issuer;
         this.validator = validator;
         this.clock = clock;
         this.attemptGate = attemptGate;
         this.stopping = stopping;
+        this.driftGate = driftGate;
     }
 
     Result run() throws IOException, InterruptedException, GeneralSecurityException {
-        if (stopping.get()) return new Result(Outcome.STOPPING, null, Optional.empty());
+        if (stopping.get()) return result(Outcome.STOPPING, null, Optional.empty());
+        ConfigurationDriftGuard.Result drift = driftGate.inspect();
+        if (!drift.allowed()) return new Result(Outcome.CONFIGURATION_DRIFT, null, Optional.empty(),
+                drift.changedFields());
         Optional<java.time.Instant> nextAttempt = attemptGate.reserve(clock.instant(), config.failureCooldown());
-        if (nextAttempt.isPresent()) return new Result(Outcome.COOLDOWN, null, nextAttempt);
-        if (stopping.get()) return new Result(Outcome.STOPPING, null, Optional.empty());
+        if (nextAttempt.isPresent()) return result(Outcome.COOLDOWN, null, nextAttempt);
+        if (stopping.get()) return result(Outcome.STOPPING, null, Optional.empty());
+        drift = driftGate.inspect();
+        if (!drift.allowed()) return new Result(Outcome.CONFIGURATION_DRIFT, null, Optional.empty(),
+                drift.changedFields());
         AcmeIssuanceService.IssuedMaterial material = issuer.issue(AcmeEnvironment.STAGING, config.contactEmail());
-        if (stopping.get()) return new Result(Outcome.STOPPING, null, Optional.empty());
+        if (stopping.get()) return result(Outcome.STOPPING, null, Optional.empty());
         IssuedCertificateValidator.ValidationResult validation = validator.validate(material, config);
-        return new Result(Outcome.INSPECTED_NOT_DEPLOYED, validation, Optional.empty());
+        return result(Outcome.INSPECTED_NOT_DEPLOYED, validation, Optional.empty());
     }
 
-    enum Outcome { INSPECTED_NOT_DEPLOYED, COOLDOWN, STOPPING }
+    private static Result result(Outcome outcome, IssuedCertificateValidator.ValidationResult validation,
+                                 Optional<java.time.Instant> nextAttempt) {
+        return new Result(outcome, validation, nextAttempt, List.of());
+    }
+
+    enum Outcome { INSPECTED_NOT_DEPLOYED, CONFIGURATION_DRIFT, COOLDOWN, STOPPING }
 
     record Result(Outcome outcome, IssuedCertificateValidator.ValidationResult validation,
-                  Optional<java.time.Instant> nextAttempt) { }
+                  Optional<java.time.Instant> nextAttempt, List<String> driftFields) {
+        Result { driftFields = List.copyOf(driftFields); }
+    }
 
     @FunctionalInterface
     interface Issuer {
@@ -58,5 +79,10 @@ final class StagingIssuanceProbe {
     interface AttemptGate {
         Optional<java.time.Instant> reserve(java.time.Instant now, java.time.Duration cooldown)
                 throws IOException, InterruptedException;
+    }
+
+    @FunctionalInterface
+    interface DriftGate {
+        ConfigurationDriftGuard.Result inspect();
     }
 }

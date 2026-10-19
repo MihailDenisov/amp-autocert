@@ -154,6 +154,26 @@ persisted cooldown prevents repeated orders. It never writes `certificate.crt` o
 `private-key.pem`, never restarts AutoModpack, and is rejected in production.
 Return the switch to `false` after the exercise.
 
+If `/ampautocert status` reports a missing baseline, incomplete staging
+validation, or configuration drift, first run `/ampautocert doctor` and correct
+every hard preflight failure. `/ampautocert reconcile` is informational and
+does not start work. The exact confirmation command is:
+
+```text
+/ampautocert reconcile confirm
+```
+
+Confirmation performs the complete preflight and then one real Let's Encrypt
+staging DNS-01 issuance against the currently configured zone. It can therefore
+create and clean temporary TXT records even when `acme.environment=production`;
+the separate staging cooldown still applies. The returned staging material is
+validated in memory and discarded. Only after the candidate configuration is
+re-read unchanged does the mod atomically accept its baseline. Any preflight,
+cooldown, issuance, validation, state-write, or configuration-race failure
+leaves automation blocked and preserves the deployed pair. Reconciliation
+never deploys staging material, restarts AutoModpack, or creates a production
+order; later production renewal still uses every normal gate.
+
 Before enabling a new production installation, complete a separate controlled
 test-zone exercise using no production token or production domain. That exercise
 should demonstrate DNS-01 record creation and cleanup, certificate validation,

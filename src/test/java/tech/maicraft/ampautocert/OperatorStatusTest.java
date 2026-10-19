@@ -45,4 +45,18 @@ class OperatorStatusTest {
         assertTrue(lines.get(3).contains("Last check: never"));
         assertTrue(lines.get(4).contains("2026-09-28T13:00:00Z"));
     }
+
+    @Test void reportsOnlySafeConfigurationDriftFieldNames() {
+        OperatorStatus status = new OperatorStatus(true, Optional.of(AcmeEnvironment.PRODUCTION),
+                "blocked configuration drift", Optional.empty(), List.of(), Optional.of(NOW),
+                "configuration_drift", Optional.empty(),
+                List.of("automodpack.endpointHost", "cloudflare.zoneId", "token value\nsecret"));
+
+        List<String> lines = status.format(CLOCK);
+
+        assertEquals(5, lines.size());
+        assertTrue(lines.get(0).contains("blocked configuration drift"));
+        assertTrue(lines.get(4).contains("automodpack.endpointHost, cloudflare.zoneId"));
+        assertFalse(String.join(" ", lines).contains("token value"));
+    }
 }

@@ -2,41 +2,32 @@
 # Copy into the Minecraft SERVER directory: automodpack/amp-autocert.properties
 # Keep disabled and staging until dedicated-server and separate test-zone checks are complete.
 enabled=false
-# Adds safe phase diagnostics. Provider payloads, tokens and key material remain suppressed.
 debugmode=false
 acme.environment=staging
-# Manual staging DNS-01 probe only. It structurally inspects in memory, then discards the result.
-acme.allowStagingIssuance=false
 acme.email=admin@mydomain.com
-acme.domains=mydomain.com,*.mydomain.com
-acme.stagingDirectory=https://acme-staging-v02.api.letsencrypt.org/directory
-acme.productionDirectory=https://acme-v02.api.letsencrypt.org/directory
-acme.networkTimeoutSeconds=30
-dns.zoneName=mydomain.com
-dns.challengeRecord=_acme-challenge.mydomain.com
-dns.propagationTimeoutSeconds=120
-# Wait briefly before the first lookup, then require agreement from both public DNS-over-HTTPS resolvers.
-dns.propagationInitialDelaySeconds=15
-dns.dohResolvers=https://cloudflare-dns.com/dns-query,https://dns.google/resolve
+origin.hostname=play.mydomain.com
+cloudflare.zoneName=mydomain.com
 cloudflare.zoneId=REPLACE_WITH_YOUR_CLOUDFLARE_ZONE_ID
-cloudflare.apiRoot=https://api.cloudflare.com/client/v4/
+
+# Bounded network and DNS behavior.
+acme.networkTimeoutSeconds=30
+dns.propagationTimeoutSeconds=120
+dns.propagationInitialDelaySeconds=15
 cloudflare.ttlSeconds=60
-# Pterodactyl fallback only. This accepts panel-created token files whose mode cannot be restricted.
-credentials.allowInsecureTokenFilePermissions=false
-# Pterodactyl fallback only. Deployment will not attempt chmod/ACL changes when true.
-credentials.allowInsecureDeploymentFilePermissions=false
-minecraft.hostname=play.mydomain.com
-minecraft.srvTarget=host.mydomain.com:25565
-automodpack.endpoint=host.mydomain.com:25570
+
+# Renewal, retry, and lightweight local drift polling.
 renew.beforeDays=30
 check.intervalHours=24
-# Persisted minimum interval between production issuance attempts, including failed activations.
+drift.pollSeconds=60
 renew.failureCooldownHours=48
-# Background retry after a failed check. Delay doubles up to retry.maxHours and uses symmetric jitter.
 retry.initialMinutes=15
 retry.maxHours=12
 retry.jitterPercent=20
+
 host.restartAfterRenew=true
-# Maximum wait for AutoModpack to reload and report the newly installed certificate.
 host.activationTimeoutSeconds=60
 host.readinessPollSeconds=1
+
+# Pterodactyl compatibility fallbacks. Prefer false whenever permissions can be enforced.
+credentials.allowInsecureTokenFilePermissions=false
+credentials.allowInsecureDeploymentFilePermissions=false

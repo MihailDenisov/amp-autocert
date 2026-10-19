@@ -11,13 +11,22 @@ import java.util.Optional;
 /** Immutable, secret-free snapshot read by server commands without filesystem or network access. */
 record OperatorStatus(boolean enabled, Optional<AcmeEnvironment> environment, String lifecycle,
                       Optional<Instant> certificateExpiry, List<String> certificateSans,
-                      Optional<Instant> lastCheck, String lastOutcome, Optional<Instant> nextAttempt) {
+                      Optional<Instant> lastCheck, String lastOutcome, Optional<Instant> nextAttempt,
+                      List<String> configurationDriftFields) {
+    OperatorStatus(boolean enabled, Optional<AcmeEnvironment> environment, String lifecycle,
+                   Optional<Instant> certificateExpiry, List<String> certificateSans,
+                   Optional<Instant> lastCheck, String lastOutcome, Optional<Instant> nextAttempt) {
+        this(enabled, environment, lifecycle, certificateExpiry, certificateSans, lastCheck, lastOutcome,
+                nextAttempt, List.of());
+    }
+
     OperatorStatus {
         environment = environment == null ? Optional.empty() : environment;
         certificateExpiry = certificateExpiry == null ? Optional.empty() : certificateExpiry;
         certificateSans = certificateSans == null ? List.of() : List.copyOf(certificateSans);
         lastCheck = lastCheck == null ? Optional.empty() : lastCheck;
         nextAttempt = nextAttempt == null ? Optional.empty() : nextAttempt;
+        configurationDriftFields = ConfigurationDriftGuard.safeFields(configurationDriftFields);
     }
 
     static OperatorStatus notStarted() {
@@ -41,6 +50,9 @@ record OperatorStatus(boolean enabled, Optional<AcmeEnvironment> environment, St
         lines.add("Deployed DNS SANs: " + (certificateSans.isEmpty() ? "not available" : String.join(", ", certificateSans)));
         lines.add("Last check: " + lastCheck.map(Object::toString).orElse("never") + "; outcome: " + lastOutcome);
         nextAttempt.ifPresent(value -> lines.add("Issuance cooldown until: " + value));
+        if (!configurationDriftFields.isEmpty()) {
+            lines.add("Automation block fields: " + String.join(", ", configurationDriftFields));
+        }
         return List.copyOf(lines);
     }
 }

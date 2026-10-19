@@ -67,6 +67,44 @@ class StagingIssuanceProbeTest {
         assertEquals(0, issuances.get());
     }
 
+    @Test void configurationDriftPreventsStagingAttemptReservationAndIssuance() throws Exception {
+        AtomicInteger attempts = new AtomicInteger();
+        AtomicInteger issuances = new AtomicInteger();
+        var probe = new StagingIssuanceProbe(AutoCertConfig.load(root), (environment, email) -> {
+            issuances.incrementAndGet();
+            return material(environment);
+        }, (issued, config) -> fail("validation must not run"), Clock.systemUTC(),
+                (now, cooldown) -> { attempts.incrementAndGet(); return java.util.Optional.empty(); },
+                () -> ConfigurationDriftGuard.Result.blocked(ConfigurationDriftGuard.State.DRIFT,
+                        List.of("automodpack.disableInternalTls")), new AtomicBoolean());
+
+        StagingIssuanceProbe.Result result = probe.run();
+
+        assertEquals(StagingIssuanceProbe.Outcome.CONFIGURATION_DRIFT, result.outcome());
+        assertEquals(List.of("automodpack.disableInternalTls"), result.driftFields());
+        assertEquals(0, attempts.get());
+        assertEquals(0, issuances.get());
+    }
+
+    @Test void driftAfterAttemptReservationStillPreventsStagingIssuance() throws Exception {
+        AtomicInteger inspections = new AtomicInteger();
+        AtomicInteger issuances = new AtomicInteger();
+        var probe = new StagingIssuanceProbe(AutoCertConfig.load(root), (environment, email) -> {
+            issuances.incrementAndGet();
+            return material(environment);
+        }, (issued, config) -> fail("validation must not run"), Clock.systemUTC(),
+                (now, cooldown) -> java.util.Optional.empty(),
+                () -> inspections.incrementAndGet() == 1
+                        ? ConfigurationDriftGuard.Result.ready()
+                        : ConfigurationDriftGuard.Result.blocked(ConfigurationDriftGuard.State.DRIFT,
+                        List.of("automodpack.connectionMode")), new AtomicBoolean());
+
+        StagingIssuanceProbe.Result result = probe.run();
+
+        assertEquals(StagingIssuanceProbe.Outcome.CONFIGURATION_DRIFT, result.outcome());
+        assertEquals(0, issuances.get());
+    }
+
     private static AcmeIssuanceService.IssuedMaterial material(AcmeEnvironment environment) {
         return new AcmeIssuanceService.IssuedMaterial(environment, "redacted fixture", new byte[] {1},
                 List.of("mydomain.com", "*.mydomain.com"));
