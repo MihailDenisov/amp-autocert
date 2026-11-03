@@ -1,95 +1,52 @@
 # amp-autocert
 
-[Русская версия](README_RU.md)
+[Русская версия](README_RU.md) · [Complete setup guide](docs/PRODUCTION_SETUP.md) · [CurseForge description](curseforge.md)
 
-**Server-only** Minecraft **1.21.1** mod on **NeoForge 21.1.248**, built with **Java 21**. It manages public Let's Encrypt certificates for AutoModpack via Cloudflare DNS-01 without OS-level Certbot or cron.
+amp-autocert is a **server-only** NeoForge mod for Minecraft **1.21.1**, NeoForge **21.1.248**, Java **21**, and AutoModpack **5.0.0-rc.1/rc.2** (`automodpack_mod`). It obtains and renews publicly trusted Let's Encrypt certificates for AutoModpack's built-in TLS host through Cloudflare DNS-01. It is intended for Pterodactyl and similar managed hosting where Certbot/cron cannot run and DNSSEC is unavailable for AutoModpack's separate AMP1 trust method. DNSSEC is not required for this certificate method. Cloudflare must be authoritative for the zone; Cloudflare Origin CA is not publicly trusted for direct Minecraft clients.
 
-> **Status: PRODUCTION PIPELINE VALIDATED.** On 2026-09-29 the operator completed live Let's Encrypt production issuance for the configured apex/wildcard pair, Cloudflare DNS-01 cleanup, crash-safe credential replacement, and activation through AutoModpack 5.0.0-rc.2. A restart retained the deployed certificate, `/ampautocert check` reported `VALID/not_due` with the expected SANs, and a client connected without manually entering a fingerprint. Fresh installations still default to disabled staging mode and must follow the production runbook.
+Current `0.2.0-rc.1` is a **prerelease** of the discovery/reconciliation workflow; see the [changelog](CHANGELOG.md) for its known limitations. Stable `v0.1.0` remains the live-validated production-renewal reference.
 
-## Build and open in VS Code
+> A reference server completed live production issuance, DNS-01 cleanup, AutoModpack 5.0.0-rc.2 activation and client verification on 2026-09-29. Each other server must be checked separately. New installations start disabled and need operator-confirmed staging validation before production issuance.
 
-1. Install **JDK 21**. For VS Code, also install the **Extension Pack for Java** and **Gradle for Java** extensions.
-2. Clone this repository: `git clone https://github.com/MihailDenisov/amp-autocert.git`, then open the project folder.
-3. Run `./gradlew test` (Windows: `gradlew.bat test`). On first run, the supplied launcher downloads the **official Gradle 8.14.3 wrapper JAR** and verifies its published SHA-256; Gradle downloads NeoForge dependencies. Internet access is required for the first full build. The project intentionally does not ship an unverified binary wrapper.
-4. Run the offline Java-only check anytime: `sh scripts/offline-smoke-test.sh` (requires JDK 21 and POSIX shell). Build the mod JAR with `./gradlew build`; the result lands in `build/libs/`.
-5. This repository publishes only the mod itself. Codex/agent workflow files (`AGENTS.md`, `CODEX_TASK.md`, `.codex/`, `.agents/`, `docs/IMPLEMENTATION_LOG.md`) and editor settings (`.vscode/`) are intentionally excluded via `.gitignore` and are not part of the public repo.
+## Addresses and limits
 
-## Your topology
+| Role | Example | Configured in |
+| --- | --- | --- |
+| Address players type | `play.example.com` | `origin.hostname` in amp-autocert |
+| Minecraft SRV target, if used | `node.example.com:25598` | DNS/Minecraft; not a certificate identifier |
+| AutoModpack endpoint | `packs.example.com:25809` | AutoModpack `advertised-endpoint-*`; discovered by the mod |
+| Certificate DNS SANs | `example.com`, `*.example.com` | Derived from `cloudflare.zoneName` |
+| DNS-01 owner | `_acme-challenge.example.com` | Derived automatically |
 
-| Service | Name / port |
+The apex/wildcard pair covers the apex and exactly one subdomain label. The join and AutoModpack endpoint hostnames must be covered; IP literals, deeper names and external TLS termination are unsupported. Ports are network routing, not certificate names. AutoModpack must have `modpack-host: true` and `disable-internal-tls: false`; assign and expose actual Minecraft and AutoModpack ports in your hosting panel. Set direct-connection A/AAAA records to Cloudflare **DNS only**. See [AutoModpack network settings](https://moddedmc.wiki/en/project/automodpack/latest/docs/configuration/server-config).
+
+## Quick setup
+
+1. Install supported AutoModpack and amp-autocert JARs on the dedicated server. Activate the zone in Cloudflare and set registrar NS to Cloudflare's assigned nameservers. Create a token limited to that zone with `Zone / DNS / Edit`.
+2. Copy [the example properties](config/amp-autocert.properties.example) to `<server-root>/automodpack/amp-autocert.properties`. Set `acme.email`, `origin.hostname`, `cloudflare.zoneName`, and `cloudflare.zoneId`. Put the token only in `AMP_AUTOCERT_CF_API_TOKEN` or the private file `automodpack/credentials/amp-autocert-cloudflare-token.txt`.
+3. Exclude `automodpack/credentials/**`, `automodpack/amp-autocert.properties`, and `automodpack/amp-autocert-state/**` from **every** AutoModpack group's client file rules. Back up the complete credentials and enrollment-state directories privately before production work.
+4. Start with `enabled=false`; run `/ampautocert doctor`. It reads local and Cloudflare/DNS state, but creates no ACME order or DNS record. A missing baseline is expected on a fresh installation.
+5. When ready, set `enabled=true`, `acme.environment=production`, `host.restartAfterRenew=true` and restart. Run `/ampautocert reconcile confirm`: full preflight plus a real Let's Encrypt **staging** DNS-01 test. It cleans its own TXT records, discards staging material and accepts the baseline only on success. It does not itself issue a production certificate.
+6. Run `/ampautocert check` for an ordinary due/not-due production check; use `/ampautocert renew` only for intentional early production rotation. Inspect `/ampautocert status`, certificate SANs and real client connectivity.
+
+Routine renewal does not repeat staging. Relevant origin, zone, endpoint, mode/port or TLS changes block issuance and deployment until another successful reconciliation. The current deployed pair is preserved on failed checks; a valid certificate is not rotated just because a new baseline is missing. Existing manual client fingerprint pins may require one-time removal. The [full runbook](docs/PRODUCTION_SETUP.md) explains all fields, secret storage, migration, backup, recovery and troubleshooting ([Русский](docs/PRODUCTION_SETUP_RU.md)).
+
+## Commands
+
+Commands require permission level 3; network/certificate work runs on a background worker.
+
+| Command | Effect |
 | --- | --- |
-| Minecraft join hostname | `play.mydomain.com` |
-| DNS A record | `host.mydomain.com` -> actual public IP, Cloudflare DNS only |
-| Minecraft SRV | `_minecraft._tcp.play.mydomain.com` -> `host.mydomain.com:25565` |
-| AutoModpack endpoint | `host.mydomain.com:25570` |
-| Requested Let's Encrypt SANs | `mydomain.com`, `*.mydomain.com` |
-| DNS validation | Cloudflare API, DNS-01; no DNSSEC required |
+| `/ampautocert status` | Cached environment, expiry/SANs, last result, cooldown and safe drift field names. |
+| `/ampautocert doctor` | Read-only preflight; does not prove DNS write access or actual endpoint reachability. |
+| `/ampautocert reconcile` | Explanation only. |
+| `/ampautocert reconcile confirm` | Full preflight, staging issuance/cleanup, then baseline acceptance; never deploys staging. |
+| `/ampautocert check` | Immediate ordinary check; does not force early renewal. |
+| `/ampautocert renew` | Intentional early production renewal; all guards and cooldown apply. |
+| `/ampautocert staging-issue` | Optional standalone staging probe only with `enabled=true`, the `staging` environment and an accepted baseline. |
 
-Cloudflare **Origin CA is not sufficient** for direct Minecraft clients; use Let's Encrypt or another publicly trusted CA. Wildcard `*.mydomain.com` covers both the `play` and `host` hostnames.
+## Build
 
-## Server configuration
+Install JDK 21 and run `./gradlew test` and `./gradlew build` (Windows: `gradlew.bat`); the JAR appears in `build/libs/`. First builds need internet for Gradle/NeoForge. A POSIX-shell Java-only check is `sh scripts/offline-smoke-test.sh`. The repository does not contain production credentials, account state or certificates. See [dependency licenses](docs/THIRD_PARTY.md).
 
-- AutoModpack implementation mod ID `automodpack_mod` is a required server-side
-  NeoForge dependency with range `[5.0.0-rc.1,5.0.0-rc.2]`. These are the two
-  releases whose credential paths and restart API were inspected. NeoForge
-  rejects missing or other versions; runtime activation also verifies the host API shape.
-- Copy `config/amp-autocert.properties.example` to the actual Minecraft server's `automodpack/amp-autocert.properties`. It is a non-secret operational file. Keep `enabled=false`, `acme.environment=staging`, and `acme.allowStagingIssuance=false` until a separate test zone and restricted token are ready. Scheduled staging mode never creates or deploys a certificate. The explicit staging probe structurally inspects and discards its untrusted result; production issuance requires `enabled=true`, `acme.environment=production`, and `host.restartAfterRenew=true`.
-- The properties file is the canonical source for the DNS zone/challenge owner, certificate domains, Let's Encrypt directory URLs, Cloudflare API root/TTL, public DNS-over-HTTPS resolvers, Minecraft hostname/SRV target, AutoModpack endpoint and bounded network/propagation timings. Apex/wildcard pairing, same-zone one-label hosts and official HTTPS provider endpoints are validated before use. Propagation waits `dns.propagationInitialDelaySeconds=15`, then requires the TXT values to agree across Cloudflare and Google DoH; one temporarily unavailable resolver is tolerated.
-- `debugmode=false` is the default concise logging mode. Setting it to `true` adds safe ACME phase, resolver hostname/status/latency, TXT count, retry timing, consensus and cleanup/recovery diagnostics. Third-party raw ACME/JWS/DNS responses, challenge values, provider tokens, account state, certificate bytes and private keys remain suppressed in both modes.
-- `host.activationTimeoutSeconds` and `host.readinessPollSeconds` bound the verified AutoModpack restart/readiness wait; readiness requires AutoModpack to report both a running host and the exact SHA-256 fingerprint of the newly installed leaf certificate.
-- `renew.failureCooldownHours` defaults to 48 and is persisted across restarts before a production issuance attempt. This prevents repeated activation failures or server restarts from creating an ACME order storm. Older configuration files safely use 48 hours when the key is absent.
-- Failed background checks use bounded exponential retry configured by `retry.initialMinutes`, `retry.maxHours`, and `retry.jitterPercent` (defaults: 15 minutes, 12 hours, 20%). Once a production issuance attempt has been reserved, retries wait until after the persisted issuance cooldown instead of bypassing it.
-- Existing configurations may add the new keys from the example to customize them. If omitted, `dns.propagationInitialDelaySeconds=15`, the two supported DoH endpoints, `host.activationTimeoutSeconds=60`, `host.readinessPollSeconds=1`, and `renew.failureCooldownHours=48` are applied as migration-safe defaults. Secrets still do not belong in this file.
-- Configure Cloudflare API token using **only** `AMP_AUTOCERT_CF_API_TOKEN` or a file at `automodpack/credentials/amp-autocert-cloudflare-token.txt` readable only by the server process. The token should have zone-scoped `Zone / DNS / Edit` permission. The `.gitignore` excludes this file.
-- If a Pterodactyl provider permits neither environment variables nor permission changes, set `credentials.allowInsecureTokenFilePermissions=true` and use that same fixed token file. This deliberately accepts panel-managed read permissions such as `0644`; writable-by-other token files/directories, alternate paths and symlinks remain rejected. Restrict panel/SFTP access to trusted administrators and keep `automodpack/credentials/**` excluded from every modpack group. Leave this option `false` everywhere else.
-- On the same restricted hosting, `credentials.allowInsecureDeploymentFilePermissions=true` prevents the future deployer from calling `chmod` or rewriting ACLs for staged certificates, keys, backups and journals. It still refuses POSIX paths writable by group/others, but may leave private material readable according to the panel/umask defaults. Restrict panel/SFTP access and leave this option `false` when permission management works.
-- Never put secrets in the public amp-autocert properties file. Explicitly exclude `automodpack/amp-autocert.properties` as well as every credential/state directory from AutoModpack's file rules; do not rely on undocumented exclusion behavior.
-- Supported AutoModpack rc.1/rc.2 installations use `automodpack/credentials/certificate.crt` for the full chain and `automodpack/credentials/private-key.pem` for an unencrypted PKCS#8 private key. The verified bytecode does not use `certificate.cert`.
-- In `automodpack/server.conf`, add `automodpack/credentials/**` and `automodpack/amp-autocert.properties` to every group's `exclude` list. Version 5 includes only `automodpack/host-modpack/<group>/` plus paths selected by that group's `from-server`; these exclusions are defense in depth against future or operator-added broad rules.
-- Do not publish a staging cert to users. Existing players with manual certificate pins must clear the old pin once when moving to public CA; subsequent public CA renewals should not require re-pinning on new clients.
-
-## Operator commands
-
-The dedicated server registers these permission-level-3 commands:
-
-- `/ampautocert status` reads the cached lifecycle snapshot and reports the configured ACME environment, certificate expiry/days remaining, deployed DNS SANs, last check/outcome, any issuance cooldown, and canonical configuration-drift field names. It never reads credentials or performs network I/O.
-- `/ampautocert doctor` runs a read-only preflight on the background worker, including AutoModpack discovery, credential-target metadata, Cloudflare token/zone access, authoritative nameservers, public NS agreement, and enrollment/drift state. It is available while renewal is disabled and never creates an ACME order, changes DNS, writes credentials, or restarts AutoModpack.
-- `/ampautocert reconcile` only explains the operation. The exact confirmation command `/ampautocert reconcile confirm` accepts the newly discovered identity/provider configuration only after full preflight and a real Let's Encrypt staging DNS-01 issuance succeed. Staging material is inspected in memory and discarded; reconciliation never deploys it or restarts AutoModpack.
-- `/ampautocert check` queues one immediate check on the existing background worker. Repeated requests are coalesced while a check is queued or running. All normal staging, production, cooldown, validation, deployment, and rollback gates still apply; this command does not force issuance.
-- `/ampautocert staging-issue` is accepted only with `acme.environment=staging` and `acme.allowStagingIssuance=true`. It creates the configured DNS-01 records, obtains a Let's Encrypt staging certificate, inspects its key/chain structure, SANs and hostname coverage in memory, cleans up its owned TXT records, and discards the untrusted result. A persisted environment-specific cooldown prevents repeated orders. It never writes or activates AutoModpack credentials.
-- `/ampautocert renew` requests renewal even when the deployed certificate is not yet due. It is rejected outside production mode and cannot bypass the persisted issuance cooldown, AutoModpack preflight, certificate validation, deployment rollback, or the single-flight gate. Use it only for an intentional production rotation.
-
-Accepted enrollment identity/provider settings are polled locally and checked again before staging or production issuance and before deployment. Relevant drift, a missing accepted baseline, unreadable settings, or incomplete staging validation blocks issuance, deployment, and host restart while preserving the deployed pair. A persisted drift block does not clear when files are merely reverted. Diagnose it with `doctor`, then use the explicitly confirmed reconciliation flow; do not edit private state. A successful reconciliation permits later production work through the normal gates but does not itself create a production order.
-
-All commands inherit the parent permission-level-3 requirement. The permission predicate has deterministic coverage; operators should still confirm their server's permission mapping before delegating command access.
-
-The complete preparation, restricted Cloudflare token, backup, staging-to-production,
-rotation, rollback, fingerprint-pin, and troubleshooting procedure is in
-[`docs/PRODUCTION_SETUP.md`](docs/PRODUCTION_SETUP.md)
-([русская версия](docs/PRODUCTION_SETUP_RU.md)). Do not enable production
-from the short configuration notes alone.
-
-## Project map
-
-| Path | Purpose |
-| --- | --- |
-| `src/main/java/.../AmpAutoCertMod.java` | server lifecycle entrypoint |
-| `docs/THIRD_PARTY.md` | pinned Jar-in-Jar artifacts, licenses and hashes |
-| `.../AutoCertService.java` | background single-flight renewal lifecycle and dependency wiring |
-| `.../RenewalCoordinator.java` | recovery, due decision, production gate and pipeline orchestration |
-| `.../DohDnsTxtResolver.java` | bounded two-provider public DNS-over-HTTPS TXT consensus lookup |
-| `.../RenewalPolicy.java` | testable expiry decision |
-| `.../CertificateInspector.java` | reads certificate expiry and DNS SAN metadata from PEM |
-| `.../CertificatePaths.java` | AutoModpack credential file paths |
-| `.../CertificateDeploymentService.java` | validated crash-safe two-file replacement |
-| `.../CertificateActivationService.java` | exact-fingerprint activation and rollback orchestration |
-| `.../AutoModpackHostControl.java` | version-pinned server-thread restart/readiness adapter |
-| `.../CloudflareCredentialSource.java` | env/private-file token lookup |
-| `src/test/` | initial JUnit tests |
-| `README_RU.md` | Russian version of this README |
-
-## Validation boundaries
-
-The workspace has deterministic fake coverage for the connected coordinator, persisted issuance cooldown, DNS cleanup, certificate validation, deployment, activation, rollback, and two-phase crash recovery. The operator additionally completed the live production flow described above on the target NeoForge/AutoModpack server. That one successful deployment does not replace regression tests or prove every provider failure and crash boundary in production. No user API keys, real certificates, ACME account state, or other runtime secrets are embedded in the repository or release JAR.
-
-References: [NeoForge 1.21.1](https://docs.neoforged.net/docs/1.21.1/gettingstarted/) · [AutoModpack security](https://moddedmc.wiki/en/project/automodpack/latest/docs/security) · [acme4j](https://github.com/shred/acme4j).
+Sources: [AutoModpack security](https://moddedmc.wiki/en/project/automodpack/latest/docs/security), [AutoModpack configuration](https://moddedmc.wiki/en/project/automodpack/latest/docs/configuration/server-config), [Let's Encrypt DNS-01](https://letsencrypt.org/docs/challenge-types/), [Let's Encrypt staging](https://letsencrypt.org/docs/staging-environment/), [Cloudflare API tokens](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/).

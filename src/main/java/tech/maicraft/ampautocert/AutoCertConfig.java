@@ -83,7 +83,7 @@ public record AutoCertConfig(boolean enabled, boolean staging, boolean debugMode
         Optional<String> legacySrv = legacyEndpoint(p, "minecraft.srvTarget", warnings);
         Optional<String> legacyEndpoint = legacyEndpoint(p, "automodpack.endpoint", warnings);
         if (p.containsKey("acme.allowStagingIssuance")) warnings.add(
-                "acme.allowStagingIssuance is deprecated; staging validation is automatic and never deployed");
+                "acme.allowStagingIssuance is deprecated and ignored; first staging validation requires /ampautocert reconcile confirm");
 
         int networkTimeout = boundedInt(p, "acme.networkTimeoutSeconds", 5, 120, 30);
         int propagationTimeout = boundedInt(p, "dns.propagationTimeoutSeconds", 30, 1800, 120);

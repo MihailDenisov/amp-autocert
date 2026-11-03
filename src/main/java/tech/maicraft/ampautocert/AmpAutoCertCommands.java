@@ -76,8 +76,8 @@ final class AmpAutoCertCommands {
         String message = switch (result) {
             case QUEUED -> "amp-autocert staging issuance queued; the result will be structurally inspected and discarded, never deployed.";
             case ALREADY_QUEUED -> "amp-autocert check, renewal, or staging issuance is already queued or running.";
-            case NOT_ALLOWED -> "amp-autocert staging issuance rejected: set acme.environment=staging and acme.allowStagingIssuance=true.";
-            case NOT_RUNNING -> "amp-autocert renewal lifecycle is not running; inspect /ampautocert status.";
+            case NOT_ALLOWED -> "amp-autocert staging issuance rejected: set acme.environment=staging; an accepted baseline is also required.";
+            case NOT_RUNNING -> "amp-autocert renewal lifecycle is not running; set enabled=true and inspect /ampautocert status.";
             case STOPPING -> "amp-autocert is stopping; no staging issuance was queued.";
         };
         source.sendSuccess(() -> Component.literal(message), false);
