@@ -1,94 +1,55 @@
 # amp-autocert
 
-[English version](README.md)
+[English](README.md) · [Полное руководство](docs/PRODUCTION_SETUP_RU.md) · [Описание для CurseForge](curseforge.md)
 
-**Серверный** мод для Minecraft **1.21.1** на **NeoForge 21.1.248**, сборка через **Java 21**. Мод управляет публичными сертификатами Let's Encrypt для AutoModpack через Cloudflare DNS-01 — без системного Certbot и cron.
+amp-autocert — **серверный** мод NeoForge для Minecraft **1.21.1**, NeoForge **21.1.248**, Java **21** и AutoModpack **5.0.0-rc.1–rc.7** (`automodpack_mod`). Он получает и продлевает публично доверенные сертификаты Let's Encrypt для встроенного TLS-хоста AutoModpack через Cloudflare DNS-01. Предназначен для Pterodactyl и похожих панельных хостингов без Certbot/cron и без возможности использовать DNSSEC для отдельного метода доверия AMP1. Для выпуска сертификата DNSSEC не нужен. Cloudflare должен быть авторитетным DNS зоны; сертификат Cloudflare Origin CA не обеспечивает публичное доверие прямых клиентов Minecraft.
 
-> **Статус: PRODUCTION-КОНВЕЙЕР ПРОВЕРЕН.** 29.09.2026 оператор выполнил реальный production-выпуск Let's Encrypt для настроенной пары apex/wildcard, очистку DNS-01 записей Cloudflare, аварийно-безопасную замену учётных файлов и активацию через AutoModpack 5.0.0-rc.2. После перезапуска сертификат сохранился, `/ampautocert check` показал `VALID/not_due` с ожидаемыми SAN, а клиент подключился без ручного ввода fingerprint. Свежие установки по-прежнему по умолчанию выключены и работают в staging-режиме — следуйте production-руководству.
+Версия `0.2.1` включает обнаружение/reconciliation и совместимый режим прав файлов на панельном хостинге; ограничения перечислены в [CHANGELOG](CHANGELOG.md).
 
-## Сборка и открытие в VS Code
+Версия `0.2.1` поддерживает проверенные AutoModpack rc.1–rc.7. Оператор сообщил об успешном production-продлении на rc.7. Более поздние версии AutoModpack потребуют отдельной проверки.
 
-1. Установите **JDK 21**. Для VS Code также установите расширения **Extension Pack for Java** и **Gradle for Java**.
-2. Клонируйте репозиторий: `git clone https://github.com/MihailDenisov/amp-autocert.git`, затем откройте папку проекта.
-3. Запустите `./gradlew test` (Windows: `gradlew.bat test`). При первом запуске лаунчер скачивает **официальный Gradle 8.14.3 wrapper JAR** и проверяет его опубликованный SHA-256; Gradle скачивает зависимости NeoForge. Для первой полной сборки нужен интернет. Проект намеренно не содержит непроверенный бинарный wrapper.
-4. Офлайн-проверка на чистой Java в любой момент: `sh scripts/offline-smoke-test.sh` (нужны JDK 21 и POSIX shell). Сборка JAR мода: `./gradlew build`, результат появится в `build/libs/`.
-5. В репозитории публикуется только сам мод. Рабочие файлы Codex/агентов (`AGENTS.md`, `CODEX_TASK.md`, `.codex/`, `.agents/`, `docs/IMPLEMENTATION_LOG.md`) и настройки редактора (`.vscode/`) намеренно исключены через `.gitignore` и не входят в публичный репозиторий.
+> На одном эталонном сервере 29.09.2026 проверены реальный production-выпуск, очистка DNS-01, активация AutoModpack 5.0.0-rc.2 и подключение клиента. Каждый другой сервер требует собственной проверки. Новая установка выключена по умолчанию и требует подтверждённой оператором staging-валидации до production-выпуска.
 
-## Пример топологии
+## Адреса и ограничения
 
-Все домены и порты ниже — абстрактный пример; подставьте свои значения.
+| Назначение | Пример | Где задаётся |
+| --- | --- | --- |
+| Адрес, который вводят игроки | `play.example.com` | `origin.hostname` в amp-autocert |
+| SRV-цель Minecraft, если нужна | `node.example.com:25598` | DNS/Minecraft; не является именем сертификата |
+| Endpoint AutoModpack | `packs.example.com:25809` | `advertised-endpoint-*` AutoModpack; мод обнаруживает сам |
+| DNS SAN сертификата | `example.com`, `*.example.com` | Выводятся из `cloudflare.zoneName` |
+| Имя DNS-01 записи | `_acme-challenge.example.com` | Выводится автоматически |
 
-| Сервис | Имя / порт |
+Пара apex/wildcard покрывает apex и ровно один уровень поддомена. Адрес игроков и hostname endpoint'а AutoModpack должны попадать под SAN; IP, более глубокие имена и внешнее завершение TLS не поддерживаются. Порты определяют маршрут, но не имя сертификата. AutoModpack должен иметь `modpack-host: true` и `disable-internal-tls: false`; выделите и откройте фактические порты Minecraft и AutoModpack в панели. A/AAAA-записи для прямого подключения держите в Cloudflare в режиме **DNS only**. См. [сетевые настройки AutoModpack](https://moddedmc.wiki/en/project/automodpack/latest/docs/configuration/server-config).
+
+## Краткая настройка
+
+1. Установите поддерживаемый AutoModpack и JAR amp-autocert на выделенный сервер. Активируйте зону Cloudflare и настройте NS у регистратора на назначенные ей nameserver'ы. Создайте токен с `Zone / DNS / Edit` только для этой зоны.
+2. Скопируйте [пример properties](config/amp-autocert.properties.example) в `<корень-сервера>/automodpack/amp-autocert.properties`. Заполните `acme.email`, `origin.hostname`, `cloudflare.zoneName`, `cloudflare.zoneId`. Токен держите только в `AMP_AUTOCERT_CF_API_TOKEN` или закрытом файле `automodpack/credentials/amp-autocert-cloudflare-token.txt`.
+3. Исключите `automodpack/credentials/**`, `automodpack/amp-autocert.properties` и `automodpack/amp-autocert-state/**` из правил выдачи клиентам **каждой** группы AutoModpack. Перед production-операциями приватно скопируйте целиком директории credentials и enrollment-state.
+4. Запустите с `enabled=false` и выполните `/ampautocert doctor`. Он читает локальные и Cloudflare/DNS данные, но не создаёт ACME order или DNS-записи. Отсутствие baseline до первого enrollment ожидаемо.
+5. Когда будете готовы, установите `enabled=true`, `acme.environment=production`, `host.restartAfterRenew=true` и перезапустите сервер. Выполните `/ampautocert reconcile confirm`: полный preflight и реальная **staging** DNS-01 проверка Let's Encrypt. Команда очищает свои TXT, отбрасывает staging-материал и принимает baseline только при успехе. Сама она не выпускает production-сертификат.
+6. Выполните `/ampautocert check` для обычного решения о сроке; `/ampautocert renew` используйте лишь для намеренной досрочной production-ротации. Проверьте `/ampautocert status`, SAN сертификата и реальное подключение клиента.
+
+При обычном продлении staging не повторяется. Изменение origin, зоны, endpoint'а, режима/порта или владельца TLS блокирует выпуск и развёртывание до новой успешной reconciliation. При ошибках проверок действующая пара сохраняется; работающий сертификат не вращается лишь из-за отсутствия нового baseline. Старый ручной fingerprint-pin клиента иногда требуется удалить один раз. [Полное руководство](docs/PRODUCTION_SETUP_RU.md) объясняет все поля, секреты, миграцию, резервное копирование, восстановление и диагностику ([English](docs/PRODUCTION_SETUP.md)).
+
+## Команды
+
+Для команд нужен уровень прав 3; сетевые и сертификатные операции идут на фоновом worker'е.
+
+| Команда | Действие |
 | --- | --- |
-| Адрес для игроков | `play.mydomain.com` |
-| DNS A-запись | `host.mydomain.com` -> реальный публичный IP, Cloudflare в режиме DNS only |
-| Minecraft SRV | `_minecraft._tcp.play.mydomain.com` -> `host.mydomain.com:25565` |
-| Endpoint AutoModpack | `host.mydomain.com:25570` |
-| Запрашиваемые SAN Let's Encrypt | `mydomain.com`, `*.mydomain.com` |
-| DNS-валидация | Cloudflare API, DNS-01; DNSSEC не требуется |
+| `/ampautocert help` или `/ampautocert` | Краткий список команд. |
+| `/ampautocert status` | Кэшированные среда, срок/SAN, результат, cooldown и безопасные имена полей drift. |
+| `/ampautocert doctor` | Диагностика только чтением; не подтверждает право записи DNS и доступность endpoint'а клиенту. |
+| `/ampautocert reconcile` | Только пояснение. |
+| `/ampautocert reconcile confirm` | Полный preflight, staging-выпуск/очистка, затем принятие baseline; staging не развёртывается. |
+| `/ampautocert check` | Немедленная обычная проверка без форсирования досрочного выпуска. |
+| `/ampautocert renew` | Намеренное досрочное production-продление с соблюдением всех барьеров и cooldown. |
+| `/ampautocert staging-issue` | Необязательная отдельная staging-проба только при `enabled=true`, среде `staging` и принятом baseline. |
 
-Cloudflare **Origin CA не подходит** для прямого подключения клиентов Minecraft; используйте Let's Encrypt или другой публично доверенный CA. Wildcard `*.mydomain.com` покрывает оба имени — `play` и `host`.
+## Сборка
 
-## Настройка сервера
+Установите JDK 21 и выполните `./gradlew test` и `./gradlew build` (Windows: `gradlew.bat`); JAR появится в `build/libs/`. Первой сборке нужен интернет для Gradle/NeoForge. Java-проверка в POSIX shell: `sh scripts/offline-smoke-test.sh`. В репозитории нет production-секретов, состояния аккаунта или сертификатов. См. [лицензии зависимостей](docs/THIRD_PARTY.md).
 
-- Реальный mod ID реализации AutoModpack — `automodpack_mod`; это обязательная
-  серверная зависимость NeoForge с диапазоном `[5.0.0-rc.1,5.0.0-rc.2]`. Это две
-  версии, чьи пути учётных файлов и API перезапуска были проверены. NeoForge
-  отклоняет отсутствующие и другие версии; при активации дополнительно
-  проверяется форма host API.
-- Скопируйте `config/amp-autocert.properties.example` в `automodpack/amp-autocert.properties` реального сервера. Это несекретный эксплуатационный файл. Держите `enabled=false`, `acme.environment=staging` и `acme.allowStagingIssuance=false`, пока не будут готовы отдельная тестовая зона и ограниченный токен. Плановый staging-режим никогда не создаёт и не устанавливает сертификат. Явная staging-проба структурно проверяет и отбрасывает недоверенный результат; production-выпуск требует `enabled=true`, `acme.environment=production` и `host.restartAfterRenew=true`.
-- Файл properties — канонический источник DNS-зоны/владельца challenge, доменов сертификата, URL директорий Let's Encrypt, API root/TTL Cloudflare, публичных DNS-over-HTTPS resolver'ов, hostname/SRV-цели Minecraft, endpoint AutoModpack и ограниченных сетевых таймаутов. Перед использованием проверяются пара apex/wildcard, односегментные хосты той же зоны и официальные HTTPS-endpoint'ы провайдеров. Ожидание распространения: `dns.propagationInitialDelaySeconds=15`, затем требуется согласие TXT-значений между Cloudflare и Google DoH; временная недоступность одного resolver'а допускается.
-- `debugmode=false` — краткий режим журнала по умолчанию. Значение `true` добавляет безопасную диагностику фаз ACME, hostname/status/latency resolver'ов, количество TXT, тайминги retry, consensus и cleanup/recovery. Сырые ACME/JWS/DNS-ответы сторонних библиотек, значения challenge, токены провайдера, состояние аккаунта, байты сертификата и приватные ключи подавляются в обоих режимах.
-- `host.activationTimeoutSeconds` и `host.readinessPollSeconds` ограничивают проверяемое ожидание перезапуска/готовности AutoModpack; готовность требует, чтобы AutoModpack сообщил и о работающем хосте, и о точном SHA-256 fingerprint нового leaf-сертификата.
-- `renew.failureCooldownHours` по умолчанию 48 и сохраняется между перезапусками перед production-попыткой. Это не даёт повторным сбоям активации или перезапускам сервера создать шторм ACME-orders. Старые конфигурации без этого ключа безопасно получают 48 часов.
-- Неудачные фоновые проверки используют ограниченный экспоненциальный retry: `retry.initialMinutes`, `retry.maxHours`, `retry.jitterPercent` (по умолчанию 15 минут, 12 часов, 20%). После резервирования production-попытки повторы ждут окончания сохранённого cooldown, а не обходят его.
-- Существующие конфигурации могут добавить новые ключи из примера. Если их нет, применяются миграционно-безопасные значения: `dns.propagationInitialDelaySeconds=15`, два поддерживаемых DoH-endpoint'а, `host.activationTimeoutSeconds=60`, `host.readinessPollSeconds=1` и `renew.failureCooldownHours=48`. Секретов в этом файле быть не должно.
-- Токен Cloudflare настраивайте **только** через `AMP_AUTOCERT_CF_API_TOKEN` или файл `automodpack/credentials/amp-autocert-cloudflare-token.txt`, доступный на чтение только серверному процессу. Токен должен иметь ограниченное зоной разрешение `Zone / DNS / Edit`. `.gitignore` исключает этот файл.
-- Если хостинг Pterodactyl не позволяет ни переменные окружения, ни смену прав, установите `credentials.allowInsecureTokenFilePermissions=true` и используйте тот же фиксированный файл. Это сознательно допускает права панели вроде `0644`; записываемые другими файлы/директории, другие пути и симлинки по-прежнему отклоняются. Ограничьте доступ к панели/SFTP доверенными администраторами и держите `automodpack/credentials/**` исключёнными из каждой группы модпака. Во всех остальных случаях оставляйте `false`.
-- На таком же ограниченном хостинге `credentials.allowInsecureDeploymentFilePermissions=true` запрещает будущему deployer'у вызывать chmod или переписывать ACL для размещаемых сертификатов, ключей, бэкапов и журналов. POSIX-пути, записываемые группой/остальными, всё равно отклоняются, но приватный материал может остаться читаемым согласно настройкам панели/umask. Ограничьте доступ к панели/SFTP и оставляйте `false`, когда управление правами работает.
-- Никогда не помещайте секреты в публичный файл amp-autocert properties. Явно исключите `automodpack/amp-autocert.properties` и все директории с учётными данными/состоянием из файловых правил AutoModpack; не полагайтесь на недокументированное поведение исключений.
-- Поддерживаемые AutoModpack rc.1/rc.2 используют `automodpack/credentials/certificate.crt` для полной цепочки и `automodpack/credentials/private-key.pem` для незашифрованного ключа PKCS#8. Проверенный байткод не использует `certificate.cert`.
-- В `automodpack/server.conf` добавьте `automodpack/credentials/**` и `automodpack/amp-autocert.properties` в список `exclude` каждой группы. Версия 5 включает только `automodpack/host-modpack/<группа>/` и пути из `from-server` этой группы; эти исключения — защита в глубину от будущих или добавленных оператором широких правил.
-- Не публикуйте staging-сертификат пользователям. Игроки с ручными pin'ами сертификата должны один раз удалить старый pin при переходе на публичный CA; последующие продления публичного CA не должны требовать повторного закрепления на новых клиентах.
-
-## Команды оператора
-
-Выделенный сервер регистрирует эти команды с уровнем прав 3:
-
-- `/ampautocert status` читает кэшированный снимок жизненного цикла и сообщает настроенную ACME-среду, срок действия/оставшиеся дни сертификата, развёрнутые DNS SAN, итог последней проверки и действующий cooldown выпуска. Никогда не читает учётные данные и не выполняет сетевой I/O.
-- `/ampautocert check` ставит одну немедленную проверку в очередь существующего фонового worker'а. Повторные запросы объединяются, пока проверка в очереди или выполняется. Все обычные барьеры staging, production, cooldown, валидации, развёртывания и rollback действуют; команда не форсирует выпуск.
-- `/ampautocert staging-issue` принимается только при `acme.environment=staging` и `acme.allowStagingIssuance=true`. Создаёт настроенные DNS-01 записи, получает staging-сертификат Let's Encrypt, проверяет в памяти структуру ключа/цепочки, SAN и покрытие имён, очищает свои TXT-записи и отбрасывает недоверенный результат. Сохраняемый cooldown по среде не даёт повторять orders. Никогда не записывает и не активирует учётные файлы AutoModpack.
-- `/ampautocert renew` запрашивает продление, даже если развёрнутый сертификат ещё не подошёл к сроку. Отклоняется вне production-режима и не может обойти сохраняемый cooldown выпуска, preflight AutoModpack, валидацию сертификата, rollback развёртывания или барьер single-flight. Используйте только для намеренной production-ротации.
-
-Все команды наследуют требование уровня прав 3. Предикат прав имеет детерминированное покрытие; операторам всё же стоит проверить отображение прав на своём сервере, прежде чем делегировать доступ к командам.
-
-Полная процедура подготовки, ограниченного токена Cloudflare, резервного копирования,
-перехода staging -> production, ротации, отката, fingerprint-pin и диагностики —
-в [`docs/PRODUCTION_SETUP_RU.md`](docs/PRODUCTION_SETUP_RU.md)
-([English version](docs/PRODUCTION_SETUP.md)). Не включайте production только по
-кратким заметкам выше.
-
-## Карта проекта
-
-| Путь | Назначение |
-| --- | --- |
-| `src/main/java/.../AmpAutoCertMod.java` | точка входа жизненного цикла сервера |
-| `docs/THIRD_PARTY.md` | закреплённые Jar-in-Jar артефакты, лицензии и хеши |
-| `.../AutoCertService.java` | фоновый single-flight жизненный цикл продления и связывание зависимостей |
-| `.../RenewalCoordinator.java` | восстановление, решение о сроке, production-барьер и оркестрация конвейера |
-| `.../DohDnsTxtResolver.java` | ограниченный TXT-консенсус по двум публичным DNS-over-HTTPS провайдерам |
-| `.../RenewalPolicy.java` | тестируемое решение о сроке действия |
-| `.../CertificateInspector.java` | читает срок действия и DNS SAN из PEM |
-| `.../CertificatePaths.java` | пути учётных файлов AutoModpack |
-| `.../CertificateDeploymentService.java` | проверенная аварийно-безопасная замена двух файлов |
-| `.../CertificateActivationService.java` | активация по точному fingerprint и оркестрация rollback |
-| `.../AutoModpackHostControl.java` | адаптер перезапуска/готовности на серверном потоке с закреплённой версией |
-| `.../CloudflareCredentialSource.java` | поиск токена в переменной окружения/приватном файле |
-| `src/test/` | начальные JUnit-тесты |
-| `README.md` | английская версия этого README |
-
-## Границы валидации
-
-В проекте есть детерминированное покрытие заглушками для связанного координатора, сохраняемого cooldown выпуска, очистки DNS, валидации сертификата, развёртывания, активации, rollback и двухфазного восстановления после аварии. Оператор дополнительно выполнил описанный выше живой production-прогон на целевом сервере NeoForge/AutoModpack. Это единичное успешное развёртывание не заменяет регрессионные тесты и не доказывает каждый сценарий сбоя провайдера или аварии в production. В репозитории и release-JAR нет пользовательских API-ключей, реальных сертификатов, состояния ACME-аккаунта или других runtime-секретов.
-
-Ссылки: [NeoForge 1.21.1](https://docs.neoforged.net/docs/1.21.1/gettingstarted/) · [Безопасность AutoModpack](https://moddedmc.wiki/en/project/automodpack/latest/docs/security) · [acme4j](https://github.com/shred/acme4j).
+Источники: [безопасность AutoModpack](https://moddedmc.wiki/en/project/automodpack/latest/docs/security), [конфигурация AutoModpack](https://moddedmc.wiki/en/project/automodpack/latest/docs/configuration/server-config), [DNS-01 Let's Encrypt](https://letsencrypt.org/docs/challenge-types/), [staging Let's Encrypt](https://letsencrypt.org/docs/staging-environment/), [токены Cloudflare](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/).

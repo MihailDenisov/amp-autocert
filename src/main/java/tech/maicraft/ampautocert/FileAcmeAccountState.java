@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.concurrent.locks.ReentrantLock;
 import java.time.Duration;
 import java.time.Instant;
@@ -44,9 +45,19 @@ public final class FileAcmeAccountState implements AcmeAccountState, IssuanceSta
     private static final String PUBLIC_END = "-----END PUBLIC KEY-----";
     private static final ConcurrentHashMap<Path, ReentrantLock> JVM_FILE_LOCKS = new ConcurrentHashMap<>();
     private final Path root;
+    private final boolean allowInsecurePermissions;
+    private final Consumer<String> warning;
+    private final AtomicBoolean warnedAboutPermissions = new AtomicBoolean();
 
     public FileAcmeAccountState(Path stateRoot) throws IOException {
+        this(stateRoot, false, ignored -> { });
+    }
+
+    public FileAcmeAccountState(Path stateRoot, boolean allowInsecurePermissions,
+                                Consumer<String> warning) throws IOException {
         root = stateRoot.toAbsolutePath().normalize();
+        this.allowInsecurePermissions = allowInsecurePermissions;
+        this.warning = java.util.Objects.requireNonNull(warning);
         rejectSymlinks(root);
         Files.createDirectories(root);
         rejectSymlinks(root);
@@ -345,7 +356,8 @@ public final class FileAcmeAccountState implements AcmeAccountState, IssuanceSta
         }
     }
 
-    private static void requirePrivateRegularFile(Path file) throws IOException {
+    private void requirePrivateRegularFile(Path file) throws IOException {
+        rejectSymlinks(file);
         if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
             throw new IOException("ACME state must be a regular file");
         }
@@ -353,16 +365,47 @@ public final class FileAcmeAccountState implements AcmeAccountState, IssuanceSta
             Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(file, LinkOption.NOFOLLOW_LINKS);
             Set<PosixFilePermission> allowed = EnumSet.of(PosixFilePermission.OWNER_READ,
                     PosixFilePermission.OWNER_WRITE);
-            if (!allowed.containsAll(permissions)) throw new IOException("ACME state file permissions are too broad");
+            if (!allowed.containsAll(permissions)) {
+                tightenExistingStateFile(file);
+                permissions = Files.getPosixFilePermissions(file, LinkOption.NOFOLLOW_LINKS);
+                if (!allowed.containsAll(permissions)) {
+                    if (!allowInsecurePermissions) throw new IOException("ACME state file permissions remain too broad");
+                    rejectSharedWrite(permissions);
+                    warnAboutPermissions();
+                }
+            }
             return;
         }
         AclFileAttributeView acl = Files.getFileAttributeView(file, AclFileAttributeView.class,
                 LinkOption.NOFOLLOW_LINKS);
-        if (acl == null) throw new IOException("Cannot verify private ACME state permissions");
-        for (AclEntry entry : acl.getAcl()) {
-            if (entry.type() == AclEntryType.ALLOW && !entry.principal().equals(acl.getOwner())) {
-                throw new IOException("ACME state file ACL grants access to another principal");
+        if (acl == null) {
+            throw new IOException("Cannot verify private ACME state permissions");
+        }
+        if (hasSharedAclAccess(acl)) {
+            tightenExistingStateFile(file);
+            if (hasSharedAclAccess(acl)) {
+                if (!allowInsecurePermissions) throw new IOException("ACME state file ACL still grants access to another principal");
+                rejectSharedAclWrite(acl);
+                warnAboutPermissions();
             }
+        }
+    }
+
+    private static boolean hasSharedAclAccess(AclFileAttributeView acl) throws IOException {
+        for (AclEntry entry : acl.getAcl()) {
+            if (entry.type() == AclEntryType.ALLOW && !entry.principal().equals(acl.getOwner())) return true;
+        }
+        return false;
+    }
+
+    private void tightenExistingStateFile(Path file) throws IOException {
+        try {
+            restrict(file, false);
+        } catch (IOException | UnsupportedOperationException | SecurityException failure) {
+            if (!allowInsecurePermissions) {
+                throw new IOException("ACME state file permissions are too broad and could not be restricted", failure);
+            }
+            warnAboutPermissions();
         }
     }
 
@@ -376,7 +419,18 @@ public final class FileAcmeAccountState implements AcmeAccountState, IssuanceSta
         }
     }
 
-    private static void restrict(Path path, boolean directory) throws IOException {
+    private void restrict(Path path, boolean directory) throws IOException {
+        rejectSymlinks(path);
+        try {
+            enforcePrivate(path, directory);
+        } catch (IOException | UnsupportedOperationException | SecurityException failure) {
+            if (!allowInsecurePermissions) throw new IOException("Cannot restrict private ACME state permissions", failure);
+            warnAboutPermissions();
+        }
+        if (allowInsecurePermissions) auditCompatiblePermissions(path);
+    }
+
+    private static void enforcePrivate(Path path, boolean directory) throws IOException {
         if (Files.getFileStore(path).supportsFileAttributeView("posix")) {
             Set<PosixFilePermission> permissions = directory
                     ? EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE)
@@ -390,5 +444,50 @@ public final class FileAcmeAccountState implements AcmeAccountState, IssuanceSta
         AclEntry ownerOnly = AclEntry.newBuilder().setType(AclEntryType.ALLOW).setPrincipal(acl.getOwner())
                 .setPermissions(EnumSet.allOf(AclEntryPermission.class)).build();
         acl.setAcl(List.of(ownerOnly));
+    }
+
+    private void auditCompatiblePermissions(Path path) throws IOException {
+        if (Files.getFileStore(path).supportsFileAttributeView("posix")) {
+            Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(path, LinkOption.NOFOLLOW_LINKS);
+            rejectSharedWrite(permissions);
+            if (permissions.contains(PosixFilePermission.GROUP_READ)
+                    || permissions.contains(PosixFilePermission.OTHERS_READ)) warnAboutPermissions();
+            return;
+        }
+        AclFileAttributeView acl = Files.getFileAttributeView(path, AclFileAttributeView.class,
+                LinkOption.NOFOLLOW_LINKS);
+        if (acl == null) {
+            throw new IOException("Cannot verify ACME state write access");
+        }
+        rejectSharedAclWrite(acl);
+        if (hasSharedAclAccess(acl)) warnAboutPermissions();
+    }
+
+    static void rejectSharedWrite(Set<PosixFilePermission> permissions) throws IOException {
+        if (permissions.contains(PosixFilePermission.GROUP_WRITE)
+                || permissions.contains(PosixFilePermission.OTHERS_WRITE)) {
+            throw new IOException("ACME state path is writable by group or others");
+        }
+    }
+
+    private static void rejectSharedAclWrite(AclFileAttributeView acl) throws IOException {
+        Set<AclEntryPermission> write = EnumSet.of(AclEntryPermission.WRITE_DATA,
+                AclEntryPermission.APPEND_DATA, AclEntryPermission.WRITE_NAMED_ATTRS,
+                AclEntryPermission.WRITE_ATTRIBUTES, AclEntryPermission.DELETE,
+                AclEntryPermission.WRITE_ACL, AclEntryPermission.WRITE_OWNER,
+                AclEntryPermission.ADD_FILE, AclEntryPermission.ADD_SUBDIRECTORY,
+                AclEntryPermission.DELETE_CHILD);
+        for (AclEntry entry : acl.getAcl()) {
+            if (entry.type() == AclEntryType.ALLOW && !entry.principal().equals(acl.getOwner())
+                    && entry.permissions().stream().anyMatch(write::contains)) {
+                throw new IOException("ACME state ACL grants unsafe non-owner write access");
+            }
+        }
+    }
+
+    private void warnAboutPermissions() {
+        if (warnedAboutPermissions.compareAndSet(false, true)) {
+            warning.accept("ACME state may be readable by other users; panel compatibility mode is enabled. Restrict panel and container access.");
+        }
     }
 }

@@ -464,7 +464,10 @@ public final class CertificateDeploymentService {
                     : EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));
             return;
         }
-        if (allowInsecurePermissions) return;
+        if (allowInsecurePermissions) {
+            CredentialTargetInspector.auditAcl(path, true, !directory);
+            return;
+        }
         AclFileAttributeView acl = Files.getFileAttributeView(path, AclFileAttributeView.class,
                 LinkOption.NOFOLLOW_LINKS);
         if (acl == null) throw new IOException("Cannot enforce private certificate deployment permissions");

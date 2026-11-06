@@ -6,7 +6,7 @@ license="${mod_license}"
 modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
-description="Dedicated-server certificate renewal scaffold for AutoModpack (ACME DNS-01 / Cloudflare)."
+description="Server-side Let's Encrypt TLS certificate issuance and renewal for AutoModpack using Cloudflare DNS-01."
 authors="amp-autocert contributors"
 displayTest="IGNORE_ALL_VERSION"
 

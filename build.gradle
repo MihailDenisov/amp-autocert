@@ -77,3 +77,12 @@ neoForge.ideSyncTask generateModMetadata
 
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
 tasks.named('test', Test) { useJUnitPlatform() }
+tasks.withType(Jar).configureEach {
+    from('LICENSE') {
+        into 'META-INF'
+        rename { 'LICENSE_amp-autocert' }
+    }
+    from('docs/THIRD_PARTY.md') {
+        into 'META-INF'
+    }
+}

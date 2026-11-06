@@ -54,16 +54,42 @@ class FileAcmeAccountStateTest {
         assertThrows(IOException.class, () -> state().loadOrCreateKeyPair(AcmeEnvironment.STAGING));
     }
 
-    @Test void rejectsExistingAccountKeyWithBroadPosixPermissionsWhenSupported() throws Exception {
+    @Test void tightensExistingAccountKeyWithBroadPosixPermissionsWhenSupported() throws Exception {
         FileAcmeAccountState state = state();
-        state.loadOrCreateKeyPair(AcmeEnvironment.STAGING);
+        var original = state.loadOrCreateKeyPair(AcmeEnvironment.STAGING);
         Path key = root.resolve("staging/account-key.pem");
         if (!Files.getFileStore(key).supportsFileAttributeView("posix")) return;
 
         Files.setPosixFilePermissions(key, EnumSet.of(PosixFilePermission.OWNER_READ,
                 PosixFilePermission.OWNER_WRITE, PosixFilePermission.GROUP_READ));
 
-        assertThrows(IOException.class, () -> state.loadOrCreateKeyPair(AcmeEnvironment.STAGING));
+        var restored = state.loadOrCreateKeyPair(AcmeEnvironment.STAGING);
+        assertArrayEquals(original.getPrivate().getEncoded(), restored.getPrivate().getEncoded());
+        assertEquals(EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE),
+                Files.getPosixFilePermissions(key));
+    }
+
+    @Test void compatibilityPolicyAllowsSharedReadButRejectsSharedWrite() {
+        assertDoesNotThrow(() -> FileAcmeAccountState.rejectSharedWrite(
+                EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.GROUP_READ)));
+        assertThrows(IOException.class, () -> FileAcmeAccountState.rejectSharedWrite(
+                EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.GROUP_WRITE)));
+    }
+
+    @Test void tightensExistingRenewalAttemptStateBeforeReadingWhenSupported() throws Exception {
+        Instant firstAttempt = Instant.parse("2026-09-28T12:00:00Z");
+        Duration cooldown = Duration.ofHours(48);
+        assertTrue(state().reserveRenewalAttempt(AcmeEnvironment.PRODUCTION,
+                firstAttempt, cooldown).isEmpty());
+        Path attempt = root.resolve("production/last-renewal-attempt.txt");
+        if (!Files.getFileStore(attempt).supportsFileAttributeView("posix")) return;
+        Files.setPosixFilePermissions(attempt, EnumSet.of(PosixFilePermission.OWNER_READ,
+                PosixFilePermission.OWNER_WRITE, PosixFilePermission.GROUP_READ));
+
+        assertEquals(firstAttempt.plus(cooldown), state().reserveRenewalAttempt(
+                AcmeEnvironment.PRODUCTION, firstAttempt.plus(Duration.ofHours(1)), cooldown).orElseThrow());
+        assertEquals(EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE),
+                Files.getPosixFilePermissions(attempt));
     }
 
     @Test void concurrentInstancesKeepOneAccountIdentity() throws Exception {

@@ -207,6 +207,68 @@ class RenewalCoordinatorTest {
         assertEquals(0, issued.get());
     }
 
+    @Test void configurationDriftBlocksAttemptIssuanceAndActivation() throws Exception {
+        AtomicBoolean hostReconciliationAllowed = new AtomicBoolean(true);
+        AtomicInteger attempts = new AtomicInteger();
+        AtomicInteger issuances = new AtomicInteger();
+        AtomicInteger activations = new AtomicInteger();
+        RenewalCoordinator coordinator = new RenewalCoordinator(productionConfig(), CLOCK,
+                hostReconciliationAllowed::set,
+                Optional::empty,
+                (environment, email) -> { issuances.incrementAndGet(); return material(); }, () -> { },
+                (now, cooldown) -> { attempts.incrementAndGet(); return Optional.empty(); },
+                ignored -> { activations.incrementAndGet(); return activated(); },
+                () -> ConfigurationDriftGuard.Result.blocked(ConfigurationDriftGuard.State.DRIFT,
+                        List.of("automodpack.endpointHost")), new AtomicBoolean());
+
+        RenewalCoordinator.Result result = coordinator.checkAndRenew();
+
+        assertEquals(RenewalCoordinator.Outcome.CONFIGURATION_DRIFT, result.outcome());
+        assertEquals(List.of("automodpack.endpointHost"), result.driftFields());
+        assertEquals(0, attempts.get());
+        assertEquals(0, issuances.get());
+        assertEquals(0, activations.get());
+        assertFalse(hostReconciliationAllowed.get(), "blocked recovery must not restart AutoModpack");
+    }
+
+    @Test void blockedRecoveryFailureCarriesSafeDriftStatus() throws Exception {
+        RenewalCoordinator coordinator = new RenewalCoordinator(productionConfig(), CLOCK,
+                allowHostReconciliation -> {
+                    assertFalse(allowHostReconciliation);
+                    throw new IOException("fixture recovery failure");
+                }, Optional::empty, (environment, email) -> material(), () -> { },
+                (now, cooldown) -> Optional.empty(), ignored -> activated(),
+                () -> ConfigurationDriftGuard.Result.blocked(ConfigurationDriftGuard.State.DRIFT,
+                        List.of("automodpack.endpointHost")), new AtomicBoolean());
+
+        RenewalCoordinator.BlockedRecoveryException failure = assertThrows(
+                RenewalCoordinator.BlockedRecoveryException.class, coordinator::checkAndRenew);
+
+        assertEquals(List.of("automodpack.endpointHost"), failure.driftFields());
+        assertNotNull(failure.getCause());
+    }
+
+    @Test void driftDetectedAfterIssuanceStillPreventsDeploymentAndRestart() throws Exception {
+        AtomicInteger inspections = new AtomicInteger();
+        AtomicInteger issuances = new AtomicInteger();
+        AtomicInteger activations = new AtomicInteger();
+        RenewalCoordinator coordinator = new RenewalCoordinator(productionConfig(), CLOCK, ignored -> { },
+                Optional::empty,
+                (environment, email) -> { issuances.incrementAndGet(); return material(); }, () -> { },
+                (now, cooldown) -> Optional.empty(),
+                ignored -> { activations.incrementAndGet(); return activated(); },
+                () -> inspections.incrementAndGet() < 5
+                        ? ConfigurationDriftGuard.Result.ready()
+                        : ConfigurationDriftGuard.Result.blocked(ConfigurationDriftGuard.State.DRIFT,
+                        List.of("cloudflare.zoneId")), new AtomicBoolean());
+
+        RenewalCoordinator.Result result = coordinator.checkAndRenew();
+
+        assertEquals(RenewalCoordinator.Outcome.CONFIGURATION_DRIFT, result.outcome());
+        assertEquals(1, issuances.get(), "completed issuance material is discarded");
+        assertEquals(0, activations.get(), "no deployment or host restart may occur");
+    }
+
     private RenewalCoordinator coordinator(AutoCertConfig config, Optional<Instant> expiry,
                                            RenewalCoordinator.Issuer issuer,
                                            RenewalCoordinator.Activator activator) {
