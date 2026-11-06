@@ -2,7 +2,9 @@
 
 [English guide](PRODUCTION_SETUP.md) · [Обзор проекта](../README_RU.md)
 
-Это руководство для предрелиза `0.2.0-rc.1`; известные ограничения приведены в [CHANGELOG](../CHANGELOG.md). У стабильной `v0.1.0` отдельно проверен production-конвейер продления.
+Это руководство для версии `0.2.1`; совместимость и ограничения приведены в [CHANGELOG](../CHANGELOG.md).
+
+Версия `0.2.1` принимает проверенные AutoModpack 5.0.0-rc.1–rc.7. Оператор сообщил об успешном production-продлении и активации хоста на rc.7; для остальных кандидатов проверена совместимость исходного кода. Более поздние версии AutoModpack требуют отдельной проверки.
 
 Это руководство для оператора **серверного** мода amp-autocert. Он получает и продлевает публично доверенные TLS-сертификаты, подписанные Let's Encrypt, для AutoModpack с помощью ACME DNS-01 и Cloudflare DNS. Основной сценарий — панельный Minecraft-хостинг, часто Pterodactyl, где нельзя установить Certbot, cron, systemd-таймеры или другие системные ACME-утилиты и нельзя включить DNSSEC для отдельного механизма доверия AutoModpack AMP1. Для выпуска через DNS-01 DNSSEC **не нужен**. Cloudflare **обязательно** должен быть авторитетным DNS зоны: мод изменяет TXT-записи через его API. Сертификат Cloudflare Origin CA не имеет нужного публичного доверия у прямых клиентов Minecraft.
 
@@ -13,7 +15,7 @@
 | Требование | Что проверить |
 | --- | --- |
 | Сервер | Minecraft Java 1.21.1, NeoForge 21.1.248, Java 21, выделенный сервер. |
-| AutoModpack | `automodpack_mod` версии **5.0.0-rc.1 или 5.0.0-rc.2**. Отсутствие/другая версия отклоняется; новые релизы требуют отдельной проверки совместимости. |
+| AutoModpack | `automodpack_mod` версии **5.0.0-rc.1–rc.7** в сборке с этим обновлением. Отсутствие/другая версия отклоняется; новые релизы требуют отдельной проверки совместимости. |
 | DNS-зона | Активная зона Cloudflare; NS у регистратора должны совпасть с назначенными Cloudflare nameserver'ами этой зоны. Одного наличия зоны в панели недостаточно. |
 | Учётные данные | API-токен с `Zone / DNS / Edit` только для нужной зоны; серверу нужен исходящий HTTPS к Cloudflare, Let's Encrypt и публичным DNS-over-HTTPS resolver'ам. |
 | Хост AutoModpack | `modpack-host: true`, `disable-internal-tls: false`, поддерживаемый `connection-mode`, читаемые загруженные и дисковые настройки и безопасные записываемые пути для учётных файлов. |
@@ -50,6 +52,8 @@ automodpack/amp-autocert-state/**
 Держите `automodpack/credentials/`, `automodpack/amp-autocert-state/` и резервные копии вне всех `host-modpack` и широких правил раздачи клиентам. В credentials могут находиться файл токена Cloudflare, состояние ACME, приватный ключ, действующий сертификат, журнал развёртывания и бэкапы. Файл `amp-autocert-state/enrollment.properties` содержит несекретный принятый baseline и фазу; храните его только на сервере, поскольку он управляет барьером выпуска. Проверьте каждую группу, а не только основную. Обычно AutoModpack раздаёт директорию группы и явные пути `from-server`; исключения защищают и от будущих изменений правил.
 
 На **остановленном** сервере до включения production или миграции сделайте приватную копию **всей** директории `automodpack/credentials/` и `automodpack/amp-autocert-state/`. Храните копии вне клиентской раздачи и публичного веб-доступа. `certificate.crt` и `private-key.pem` всегда сохраняйте парой: поддерживаемые сборки AutoModpack читают `automodpack/credentials/certificate.crt` (PEM, leaf первым, полная цепочка) и `automodpack/credentials/private-key.pem` (незашифрованный PKCS#8). Не заменяйте вручную только один файл. Состояние ACME лежит под `automodpack/credentials/amp-autocert/`, а несекретный enrollment baseline — под `automodpack/amp-autocert-state/`. Не редактируйте и не удаляйте их ради обхода блокировки.
+
+Мод сначала пытается ограничить доступ к файлам состояния ACME: `0600` на POSIX или ACL только для владельца. Командная строка не нужна. При `credentials.allowInsecureDeploymentFilePermissions=false` неудача блокирует выпуск и сохраняет установленную пару. При `true` мод предупреждает и продолжает, если файлы состояния ACME или установленные credentials остаются доступными другим пользователям только на чтение. Запись для группы/остальных и символические ссылки по-прежнему блокируются. В совместимом режиме другие пользователи панели/контейнера могут прочитать ключ ACME-аккаунта, состояние DNS challenge или приватный ключ сертификата; ограничьте доступ к панели, SFTP и резервным копиям. На проверку файла токена Cloudflare этот параметр не влияет: для него есть отдельный флаг.
 
 ## 4. Заполнение `amp-autocert.properties`
 
@@ -94,7 +98,8 @@ credentials.allowInsecureDeploymentFilePermissions=false
 | `renew.beforeDays`, `check.intervalHours`, `drift.pollSeconds` | Окно продления 30 дней, плановая проверка каждые 24 часа, локальная проверка значимой конфигурации каждые 60 секунд. Локальный poll не обращается к сети. |
 | `renew.failureCooldownHours`, `retry.initialMinutes`, `retry.maxHours`, `retry.jitterPercent` | Сохраняемый cooldown попыток 48 часов и ограниченный retry: 15 минут, максимум 12 часов, jitter 20%. Команды и рестарты не сбрасывают cooldown. |
 | `host.restartAfterRenew`, `host.activationTimeoutSeconds`, `host.readinessPollSeconds` | Для production нужен автоматический перезапуск хоста. По умолчанию true, 60 и 1 секунда; успех требует точного fingerprint нового сертификата у работающего хоста. |
-| `credentials.allowInsecureTokenFilePermissions`, `credentials.allowInsecureDeploymentFilePermissions` | Оставьте false, если ограничения панели не требуют совместимого режима. Переключатель развёртывания отключает chmod/ACL и может оставить приватные файлы читаемыми по правилам панели; POSIX-пути с записью для группы/остальных всё равно запрещены. |
+| `credentials.allowInsecureTokenFilePermissions` | Допускает чтение панельного файла токена Cloudflare другими пользователями, если нельзя установить приватные права. Запись группы/остальных и симлинки запрещены. По возможности используйте приватную переменную панели. |
+| `credentials.allowInsecureDeploymentFilePermissions` | По умолчанию `false`. При `true` развёртывание не меняет права файлов, а ACME state пытается ограничить права, но может продолжить при общем доступе только на чтение. Мод выводит предупреждение; запись группы/остальных и симлинки блокируются. Включайте, только если панель не позволяет обеспечить приватные права. |
 
 В новый файл **не добавляйте** `acme.domains`, `dns.challengeRecord`, `minecraft.srvTarget`, `automodpack.endpoint`, URL директорий ACME, API root Cloudflare и URL DoH-resolver'ов. Домены и challenge выводятся автоматически; параметры сети/TLS читаются из AutoModpack; адреса провайдеров закреплены в коде. Старый флаг `acme.allowStagingIssuance` устарел и в этой версии не управляет staging-пробой.
 
@@ -107,6 +112,21 @@ credentials.allowInsecureDeploymentFilePermissions=false
 5. Проверьте ожидаемые DNS SAN, срок действия, status, готовность хоста AutoModpack, реальную загрузку и вход клиента Minecraft. Сертификат покрывает имена; отдельно проверьте открытые порты панели и публичный маршрут. Успешные unit-тесты или `doctor` не доказывают доступность сервера для игрока.
 
 `/ampautocert staging-issue` — **необязательная отдельная** проверка при `enabled=true`, `acme.environment=staging` **и уже принятом baseline**. Обычный плановый staging-режим ничего не выдаёт и не развёртывает. Ключ `acme.allowStagingIssuance=true` не требуется. Для первого enrollment и reconciliation используйте `/ampautocert reconcile confirm`. Сертификаты Let's Encrypt staging не имеют публичного доверия и никогда не ставятся в действующие credentials AutoModpack. См. [staging Let's Encrypt](https://letsencrypt.org/docs/staging-environment/) и [описание DNS-01](https://letsencrypt.org/docs/challenge-types/).
+
+### Справка по командам
+
+Все команды требуют уровень оператора 3. `/ampautocert` и `/ampautocert help` выводят краткий список. Длительные операции ставятся в очередь фонового worker; дождитесь сообщения о результате и проверьте `status`.
+
+| Команда | Условия и действие |
+| --- | --- |
+| `/ampautocert help` | Список команд с краткими описаниями; сеть и сертификаты не затрагиваются. |
+| `/ampautocert status` | Кэшированный статус, среда, срок/SAN установленного сертификата, последний результат, cooldown/drift; нового preflight нет. |
+| `/ampautocert doctor` | Ограниченные локальные, Cloudflare и публичные DNS-проверки только чтением; не выпускает и не развёртывает сертификат и не пишет DNS. |
+| `/ampautocert reconcile` | Пояснение перед подтверждением; ничего не меняет. |
+| `/ampautocert reconcile confirm` | Требует запущенный включённый мод. Полный preflight, реальный staging DNS-01, очистка собственных TXT и сохранение принятого baseline. Не развёртывает staging и не создаёт production order. |
+| `/ampautocert check` | Требует работающий мод. Обычное решение по сроку: production-выпуск возможен при наступлении окна с соблюдением всех барьеров и cooldown. |
+| `/ampautocert renew` | Требует работающий мод и `acme.environment=production`. Запрашивает досрочный production-выпуск с проверкой baseline, preflight, cooldown, нового сертификата и активации. Может заменить действующий сертификат. |
+| `/ampautocert staging-issue` | Требует `enabled=true`, `acme.environment=staging` и принятый baseline. Отдельная staging-проба; сертификат отбрасывается и не развёртывается. |
 
 ## 6. Продление, миграция, drift и восстановление
 
@@ -122,7 +142,7 @@ credentials.allowInsecureDeploymentFilePermissions=false
 
 | Симптом | Что проверить / сделать |
 | --- | --- |
-| Мод не загрузился, команд нет | Проверьте Java/NeoForge, оба серверных JAR и точную зависимость AutoModpack rc.1/rc.2. |
+| Мод не загрузился, команд нет | Проверьте Java/NeoForge, оба серверных JAR и поддерживаемую зависимость AutoModpack rc.1–rc.7. |
 | Ошибка загрузки конфига | Проверьте обязательные email, origin, имя/ID зоны и булевы значения; удалите конфликтующие старые alias/вычисляемые ключи; перезапустите. |
 | `doctor` сообщает об отсутствии baseline | До первого enrollment это ожидаемо; изучите другие проверки, затем включите production и выполните `reconcile confirm`. До успеха обычный выпуск блокируется. |
 | AutoModpack не поддерживается или загруженный конфиг не совпадает с дисковым | Проверьте версию, `server.conf`, reload/restart, `modpack-host`, режим, bind/advertised-порты и внутренний TLS. Не обходите расхождение. |

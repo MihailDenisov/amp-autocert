@@ -2,9 +2,11 @@
 
 [Русская версия](README_RU.md) · [Complete setup guide](docs/PRODUCTION_SETUP.md) · [CurseForge description](curseforge.md)
 
-amp-autocert is a **server-only** NeoForge mod for Minecraft **1.21.1**, NeoForge **21.1.248**, Java **21**, and AutoModpack **5.0.0-rc.1/rc.2** (`automodpack_mod`). It obtains and renews publicly trusted Let's Encrypt certificates for AutoModpack's built-in TLS host through Cloudflare DNS-01. It is intended for Pterodactyl and similar managed hosting where Certbot/cron cannot run and DNSSEC is unavailable for AutoModpack's separate AMP1 trust method. DNSSEC is not required for this certificate method. Cloudflare must be authoritative for the zone; Cloudflare Origin CA is not publicly trusted for direct Minecraft clients.
+amp-autocert is a **server-only** NeoForge mod for Minecraft **1.21.1**, NeoForge **21.1.248**, Java **21**, and AutoModpack **5.0.0-rc.1 through rc.7** (`automodpack_mod`). It obtains and renews publicly trusted Let's Encrypt certificates for AutoModpack's built-in TLS host through Cloudflare DNS-01. It is intended for Pterodactyl and similar managed hosting where Certbot/cron cannot run and DNSSEC is unavailable for AutoModpack's separate AMP1 trust method. DNSSEC is not required for this certificate method. Cloudflare must be authoritative for the zone; Cloudflare Origin CA is not publicly trusted for direct Minecraft clients.
 
-Current `0.2.0-rc.1` is a **prerelease** of the discovery/reconciliation workflow; see the [changelog](CHANGELOG.md) for its known limitations. Stable `v0.1.0` remains the live-validated production-renewal reference.
+Version `0.2.1` includes discovery/reconciliation and panel-host permission compatibility; see the [changelog](CHANGELOG.md) for limitations.
+
+Version `0.2.1` supports inspected AutoModpack rc.1–rc.7. The operator reported a successful production renewal on rc.7. Later AutoModpack releases require a separate compatibility review.
 
 > A reference server completed live production issuance, DNS-01 cleanup, AutoModpack 5.0.0-rc.2 activation and client verification on 2026-09-29. Each other server must be checked separately. New installations start disabled and need operator-confirmed staging validation before production issuance.
 
@@ -37,6 +39,7 @@ Commands require permission level 3; network/certificate work runs on a backgrou
 
 | Command | Effect |
 | --- | --- |
+| `/ampautocert help` or `/ampautocert` | Short command list. |
 | `/ampautocert status` | Cached environment, expiry/SANs, last result, cooldown and safe drift field names. |
 | `/ampautocert doctor` | Read-only preflight; does not prove DNS write access or actual endpoint reachability. |
 | `/ampautocert reconcile` | Explanation only. |

@@ -94,7 +94,7 @@ public final class AutoCertService {
             if (cfg.allowInsecureTokenFilePermissions())
                 LOG.warn("Insecure Cloudflare token-file permission compatibility mode is enabled; restrict panel and container access.");
             if (cfg.allowInsecureDeploymentFilePermissions())
-                LOG.warn("Insecure certificate deployment permission compatibility mode is enabled; deployment will not change file permissions.");
+                LOG.warn("Insecure deployment and ACME state permission compatibility mode is enabled; private files may be readable by other users. Restrict panel and container access.");
             if (cfg.debugMode())
                 LOG.info("amp-autocert safe diagnostic logging is enabled; provider payloads, tokens, account state and key material remain suppressed.");
             CertificatePaths paths = CertificatePaths.inside(root);
@@ -591,12 +591,13 @@ public final class AutoCertService {
         activeDriftGuard.acceptAfterReconciliation(candidate);
     }
 
-    private static FileAcmeAccountState accountState(CertificatePaths paths,
+    private FileAcmeAccountState accountState(CertificatePaths paths,
                                                       AtomicReference<FileAcmeAccountState> reference)
             throws IOException {
         FileAcmeAccountState existing = reference.get();
         if (existing != null) return existing;
-        FileAcmeAccountState created = new FileAcmeAccountState(paths.accountState());
+        FileAcmeAccountState created = new FileAcmeAccountState(paths.accountState(),
+                config.allowInsecureDeploymentFilePermissions(), message -> LOG.warn("{}", message));
         if (reference.compareAndSet(null, created)) return created;
         return reference.get();
     }

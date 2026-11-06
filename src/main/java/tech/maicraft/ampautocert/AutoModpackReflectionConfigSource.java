@@ -10,7 +10,7 @@ import java.nio.file.Path;
 import java.util.Optional;
 
 /**
- * Adapter pinned to AutoModpack 5.0.0-rc.1/rc.2. It prefers the loaded effective object and uses
+ * Adapter pinned to AutoModpack 5.0.0-rc.1 through rc.7. It prefers the loaded effective object and uses
  * AutoModpack's own Reconf parser for read-only semantic drift checks of an existing server.conf.
  */
 final class AutoModpackReflectionConfigSource implements AutoModpackConfigSource {

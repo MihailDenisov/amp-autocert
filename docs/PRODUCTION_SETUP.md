@@ -2,7 +2,9 @@
 
 [Русское руководство](PRODUCTION_SETUP_RU.md) · [Project overview](../README.md)
 
-This guide describes prerelease `0.2.0-rc.1`; see the [changelog](../CHANGELOG.md) for known limitations. Stable `v0.1.0` has a separately validated production-renewal pipeline.
+This guide describes `0.2.1`; see the [changelog](../CHANGELOG.md) for compatibility and limitations.
+
+Version `0.2.1` accepts inspected AutoModpack 5.0.0-rc.1 through rc.7. The operator has reported a successful production renewal and host activation with rc.7; other release candidates have source-level compatibility checks. Later AutoModpack releases require separate review.
 
 This is an operator runbook for the **server-only** amp-autocert mod. It obtains and renews publicly trusted, CA-signed TLS certificates for AutoModpack using Let's Encrypt ACME DNS-01 and Cloudflare DNS. The intended host is a managed Minecraft server, often Pterodactyl, where the operator cannot install Certbot, cron, systemd timers, or other OS-level ACME tools and cannot enable DNSSEC for AutoModpack's AMP1 trust path. DNSSEC is **not required** for DNS-01 issuance. Cloudflare **must** be authoritative for the zone because the mod edits its DNS records through the Cloudflare API. A Cloudflare Origin CA certificate is not publicly trusted by direct Minecraft clients.
 
@@ -13,7 +15,7 @@ The mod uses AutoModpack's built-in TLS termination. It does not provision an ex
 | Requirement | What to verify |
 | --- | --- |
 | Server | Minecraft Java 1.21.1, NeoForge 21.1.248, Java 21, dedicated server. |
-| AutoModpack | `automodpack_mod` version **5.0.0-rc.1 or 5.0.0-rc.2**. Missing/other versions are rejected; later releases need a separate compatibility review. |
+| AutoModpack | `automodpack_mod` version **5.0.0-rc.1 through 5.0.0-rc.7** in a build containing this update. Missing/other versions are rejected; later releases need a separate compatibility review. |
 | DNS zone | Active Cloudflare zone; registrar NS delegation must equal that zone's assigned Cloudflare nameservers. A zone merely present in the dashboard is insufficient. |
 | Credentials | Zone-scoped API token with `Zone / DNS / Edit`; server must read it and reach Cloudflare, Let's Encrypt, and public DNS-over-HTTPS resolvers over outbound HTTPS. |
 | AutoModpack host | `modpack-host: true`, `disable-internal-tls: false`, supported `connection-mode`, readable effective/on-disk configuration, and safe writable credential targets. |
@@ -50,6 +52,8 @@ automodpack/amp-autocert-state/**
 Keep `automodpack/credentials/`, `automodpack/amp-autocert-state/`, and backups outside all `host-modpack` directories and any broad client file-selection rules. Credentials can contain the Cloudflare token file, ACME account state, issued private key, active certificate, deployment journal, and recovery backups. `amp-autocert-state/enrollment.properties` contains the non-secret accepted baseline and phase; keep it server-side because it controls the issuance gate. Check every group rather than only the default group. AutoModpack normally distributes its group directory plus explicit `from-server` paths; the exclusions add defense against future rule changes.
 
 On a **stopped** server, make a private backup of the **entire** `automodpack/credentials/` directory and `automodpack/amp-autocert-state/` before enabling production or migrating an existing deployment. Store it outside client sync and web-accessible locations. Keep `certificate.crt` and `private-key.pem` together: supported AutoModpack builds read `automodpack/credentials/certificate.crt` (leaf-first PEM full chain) and `automodpack/credentials/private-key.pem` (unencrypted PKCS#8). Do not manually overwrite one file. ACME account state lives under `automodpack/credentials/amp-autocert/`; the non-secret enrollment baseline lives under `automodpack/amp-autocert-state/`. Do not edit or delete either to bypass a block.
+
+The mod first tries to restrict ACME state files to owner-only `0600` on POSIX or an owner-only ACL. No shell command is needed. With `credentials.allowInsecureDeploymentFilePermissions=false`, a failed restriction blocks issuance and preserves the deployed pair. With that setting `true`, the mod warns and continues if the filesystem leaves ACME state or deployed credentials readable by other users. Group/other write access to ACME state or credential paths and symbolic links still block operation. The ACME account key, pending DNS challenge state and deployment private key may be exposed to other panel/container users in compatibility mode; restrict panel users, SFTP and backups accordingly. This switch does not affect Cloudflare token-file checks; use its separate setting only if needed.
 
 ## 4. Fill in `amp-autocert.properties`
 
@@ -94,7 +98,8 @@ credentials.allowInsecureDeploymentFilePermissions=false
 | `renew.beforeDays`, `check.intervalHours`, `drift.pollSeconds` | Renew inside the 30-day window; scheduled check every 24 h; local relevant-config poll every 60 s by default. The local drift poll makes no network request. |
 | `renew.failureCooldownHours`, `retry.initialMinutes`, `retry.maxHours`, `retry.jitterPercent` | Persisted issuance cooldown (48 h) and bounded retry (15 min, max 12 h, 20% jitter). Repeated commands/restarts do not bypass the cooldown. |
 | `host.restartAfterRenew`, `host.activationTimeoutSeconds`, `host.readinessPollSeconds` | Automatic host activation must be enabled for production. Defaults: true, 60 s, 1 s; success requires the running host to report the exact new certificate fingerprint. |
-| `credentials.allowInsecureTokenFilePermissions`, `credentials.allowInsecureDeploymentFilePermissions` | Leave false unless panel restrictions force the documented compatibility modes. The deployment switch avoids chmod/ACL attempts and may leave private material readable under panel defaults; it never permits group/other-writable POSIX paths. |
+| `credentials.allowInsecureTokenFilePermissions` | Allows a panel-created Cloudflare token file to be readable by other users when private permissions cannot be set. Does not allow group/other write access or symlinks. Prefer a private panel environment variable. |
+| `credentials.allowInsecureDeploymentFilePermissions` | Defaults to `false`. When `true`, deployment does not change file permissions and ACME state attempts to restrict permissions but may continue with read-only access for other users. Emits a warning; group/other write access and symlinks still block operation. Use only if the panel cannot enforce private file modes. |
 
 Do **not** add `acme.domains`, `dns.challengeRecord`, `minecraft.srvTarget`, `automodpack.endpoint`, ACME directory URLs, Cloudflare API root, or DoH resolver URLs to a new file. Domains/challenge are derived; network/TLS identity is read from AutoModpack; provider endpoints are pinned in code. The old `acme.allowStagingIssuance` flag is deprecated and has no gating effect in this version.
 
@@ -107,6 +112,21 @@ Do **not** add `acme.domains`, `dns.challengeRecord`, `minecraft.srvTarget`, `au
 5. Confirm expected DNS SANs, expiry, status, AutoModpack host readiness, actual downloads and a clean Minecraft client join. The certificate covers the DNS names; also verify the panel's exposed ports and the public route. A success from unit tests or `doctor` does not prove a real player can connect.
 
 `/ampautocert staging-issue` is an **optional separate** probe when `enabled=true`, the configured environment is `staging`, **and an accepted baseline already exists**. Normal scheduled staging mode does not issue or deploy. There is no `acme.allowStagingIssuance=true` requirement. First enrollment and reconciliation use `/ampautocert reconcile confirm` instead. Let's Encrypt staging certificates are not publicly trusted and are never installed as AutoModpack's active credentials. See [Let's Encrypt staging](https://letsencrypt.org/docs/staging-environment/) and [DNS-01 challenge documentation](https://letsencrypt.org/docs/challenge-types/).
+
+### Command reference
+
+All commands require operator permission level 3. `/ampautocert` and `/ampautocert help` print the short list. Long-running work is queued on the background worker; read the completion message and then check `status`.
+
+| Command | Preconditions and effect |
+| --- | --- |
+| `/ampautocert help` | Lists the commands and their short descriptions; no network or certificate changes. |
+| `/ampautocert status` | Shows cached lifecycle state, environment, deployed expiry/SANs, last outcome and cooldown/drift information; does not run a fresh preflight. |
+| `/ampautocert doctor` | Runs bounded local, Cloudflare and public DNS reads; never issues or deploys a certificate or writes DNS. |
+| `/ampautocert reconcile` | Explains the confirmation step; makes no changes. |
+| `/ampautocert reconcile confirm` | Requires an initialized enabled lifecycle. Runs preflight and real staging DNS-01 issuance, cleans owned TXT records and persists the accepted configuration baseline. It never deploys staging material or creates a production order. |
+| `/ampautocert check` | Requires a running lifecycle. Runs the normal due-date decision; production issuance can start when due, subject to all gates and cooldown. |
+| `/ampautocert renew` | Requires a running lifecycle and `acme.environment=production`. Requests early production issuance, subject to baseline, preflight, cooldown, validation and activation checks. This can replace the active certificate. |
+| `/ampautocert staging-issue` | Requires `enabled=true`, `acme.environment=staging` and an accepted baseline. Runs a separate staging exercise, discards the certificate and never deploys it. |
 
 ## 6. Renewal, migration, drift, and recovery
 
@@ -122,7 +142,7 @@ For manual emergency restore: set `enabled=false`, stop Minecraft, retain the fa
 
 | Symptom | Check / action |
 | --- | --- |
-| Mod missing, no commands | Verify Java/NeoForge version, both server-side JARs, and exact AutoModpack rc.1/rc.2 dependency. |
+| Mod missing, no commands | Verify Java/NeoForge version, both server-side JARs, and supported AutoModpack rc.1–rc.7 dependency. |
 | Config load fails | Confirm required email, origin, zone name/ID and booleans; remove conflicting legacy aliases or derived values; restart after edits. |
 | `doctor` says baseline missing | Expected before enrollment; inspect all other checks, then enable production and run `reconcile confirm` when ready. Ordinary production is blocked until success. |
 | AutoModpack unsupported or on-disk/loaded mismatch | Check version, `server.conf`, reload/restart, `modpack-host`, connection mode, bind/advertised ports, and internal TLS. Do not bypass the mismatch. |

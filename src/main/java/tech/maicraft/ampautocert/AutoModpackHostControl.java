@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.BooleanSupplier;
@@ -13,7 +14,10 @@ import java.util.function.Consumer;
 
 /** Host control for the inspected AutoModpack 5.0.0 release candidates. */
 final class AutoModpackHostControl {
-    static final String SUPPORTED_VERSION_RANGE = "5.0.0-rc.1 through 5.0.0-rc.2";
+    static final String SUPPORTED_VERSION_RANGE = "5.0.0-rc.1 through 5.0.0-rc.7";
+    private static final Set<String> SUPPORTED_VERSIONS = Set.of(
+            "5.0.0-rc.1", "5.0.0-rc.2", "5.0.0-rc.3", "5.0.0-rc.4",
+            "5.0.0-rc.5", "5.0.0-rc.6", "5.0.0-rc.7");
     private static final String RESTART_COMMAND = "automodpack host restart";
 
     private final RestartDispatcher restartDispatcher;
@@ -204,6 +208,6 @@ final class AutoModpackHostControl {
     }
 
     static boolean isSupportedVersion(Object value) {
-        return "5.0.0-rc.1".equals(value) || "5.0.0-rc.2".equals(value);
+        return value instanceof String version && SUPPORTED_VERSIONS.contains(version);
     }
 }

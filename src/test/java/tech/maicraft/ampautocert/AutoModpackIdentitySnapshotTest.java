@@ -26,6 +26,14 @@ class AutoModpackIdentitySnapshotTest {
                 "play.example.com", "example.com", 25565));
     }
 
+    @Test void resolvesRc7AdvertisedEndpointWithInternalTls() {
+        AutoModpackIdentitySnapshot snapshot = AutoModpackIdentitySnapshot.resolve("5.0.0-rc.7", true,
+                "MAGIC", 25809, "hm.maicraft.tech", 25809, false,
+                "play.maicraft.tech", "maicraft.tech", 25565);
+        assertEquals("hm.maicraft.tech:25809", snapshot.endpoint());
+        assertEquals(25809, snapshot.bindPort());
+    }
+
     @Test void blocksExternalTlsIpsUnsupportedVersionsAndNamesOutsideSans() {
         assertBlocked("disable-internal-tls", () -> AutoModpackIdentitySnapshot.resolve("5.0.0-rc.2", true,
                 "MAGIC", -1, "packs.example.com", -1, true,

@@ -2,9 +2,11 @@
 
 [English](README.md) · [Полное руководство](docs/PRODUCTION_SETUP_RU.md) · [Описание для CurseForge](curseforge.md)
 
-amp-autocert — **серверный** мод NeoForge для Minecraft **1.21.1**, NeoForge **21.1.248**, Java **21** и AutoModpack **5.0.0-rc.1/rc.2** (`automodpack_mod`). Он получает и продлевает публично доверенные сертификаты Let's Encrypt для встроенного TLS-хоста AutoModpack через Cloudflare DNS-01. Предназначен для Pterodactyl и похожих панельных хостингов без Certbot/cron и без возможности использовать DNSSEC для отдельного метода доверия AMP1. Для выпуска сертификата DNSSEC не нужен. Cloudflare должен быть авторитетным DNS зоны; сертификат Cloudflare Origin CA не обеспечивает публичное доверие прямых клиентов Minecraft.
+amp-autocert — **серверный** мод NeoForge для Minecraft **1.21.1**, NeoForge **21.1.248**, Java **21** и AutoModpack **5.0.0-rc.1–rc.7** (`automodpack_mod`). Он получает и продлевает публично доверенные сертификаты Let's Encrypt для встроенного TLS-хоста AutoModpack через Cloudflare DNS-01. Предназначен для Pterodactyl и похожих панельных хостингов без Certbot/cron и без возможности использовать DNSSEC для отдельного метода доверия AMP1. Для выпуска сертификата DNSSEC не нужен. Cloudflare должен быть авторитетным DNS зоны; сертификат Cloudflare Origin CA не обеспечивает публичное доверие прямых клиентов Minecraft.
 
-Текущая `0.2.0-rc.1` — **предрелиз** механизма обнаружения/reconciliation; известные ограничения перечислены в [CHANGELOG](CHANGELOG.md). Стабильная `v0.1.0` остаётся эталоном с реальной проверкой production-продления.
+Версия `0.2.1` включает обнаружение/reconciliation и совместимый режим прав файлов на панельном хостинге; ограничения перечислены в [CHANGELOG](CHANGELOG.md).
+
+Версия `0.2.1` поддерживает проверенные AutoModpack rc.1–rc.7. Оператор сообщил об успешном production-продлении на rc.7. Более поздние версии AutoModpack потребуют отдельной проверки.
 
 > На одном эталонном сервере 29.09.2026 проверены реальный production-выпуск, очистка DNS-01, активация AutoModpack 5.0.0-rc.2 и подключение клиента. Каждый другой сервер требует собственной проверки. Новая установка выключена по умолчанию и требует подтверждённой оператором staging-валидации до production-выпуска.
 
@@ -37,6 +39,7 @@ amp-autocert — **серверный** мод NeoForge для Minecraft **1.21.
 
 | Команда | Действие |
 | --- | --- |
+| `/ampautocert help` или `/ampautocert` | Краткий список команд. |
 | `/ampautocert status` | Кэшированные среда, срок/SAN, результат, cooldown и безопасные имена полей drift. |
 | `/ampautocert doctor` | Диагностика только чтением; не подтверждает право записи DNS и доступность endpoint'а клиенту. |
 | `/ampautocert reconcile` | Только пояснение. |

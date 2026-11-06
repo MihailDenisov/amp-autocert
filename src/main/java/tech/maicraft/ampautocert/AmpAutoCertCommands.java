@@ -11,6 +11,8 @@ final class AmpAutoCertCommands {
     static void register(CommandDispatcher<CommandSourceStack> dispatcher, AutoCertService service) {
         dispatcher.register(Commands.literal("ampautocert")
                 .requires(source -> CommandPermission.isAllowed(source::hasPermission))
+                .executes(context -> help(context.getSource()))
+                .then(Commands.literal("help").executes(context -> help(context.getSource())))
                 .then(Commands.literal("status").executes(context -> status(context.getSource(), service)))
                 .then(Commands.literal("doctor").executes(context -> doctor(context.getSource(), service)))
                 .then(Commands.literal("check").executes(context -> check(context.getSource(), service)))
@@ -20,6 +22,11 @@ final class AmpAutoCertCommands {
                         .then(Commands.literal("confirm")
                                 .executes(context -> reconcile(context.getSource(), service))))
                 .then(Commands.literal("renew").executes(context -> renew(context.getSource(), service))));
+    }
+
+    private static int help(CommandSourceStack source) {
+        for (String line : CommandHelp.lines()) source.sendSuccess(() -> Component.literal(line), false);
+        return 1;
     }
 
     private static int status(CommandSourceStack source, AutoCertService service) {

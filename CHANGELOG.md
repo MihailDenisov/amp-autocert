@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1 — 2026-11-06
+
+- Added `/ampautocert help` (also shown by `/ampautocert`) and expanded English/Russian command and permission documentation.
+- On managed hosting, automatically tighten existing ACME state-file permissions before reading them. With `credentials.allowInsecureDeploymentFilePermissions=true`, read-only access for other users can remain when the panel cannot restrict it; the mod warns and continues. Shared write access and symbolic links remain blocked. With the default `false`, private permissions are required.
+
+- Extended inspected AutoModpack 5.0.0 release-candidate compatibility from rc.1/rc.2 to rc.1–rc.7. Verified the configuration fields, parser signature, host-state methods, and certificate paths in upstream rc.1–rc.7 source; checked the published rc.7 JAR signatures.
+- The operator reported a successful production renewal, AutoModpack host restart and activation on rc.7 on 2026-11-06. This live result does not validate every supported release candidate. Later AutoModpack versions remain blocked pending review.
+- Upstream evidence: [rc.7 release](https://github.com/Skidamek/AutoModpack/releases/tag/v5.0.0-rc.7), [configuration fields](https://github.com/Skidamek/AutoModpack/blob/v5.0.0-rc.7/core/src/main/java/pl/skidam/automodpack_core/config/ServerConfigJsons.java), [config parser](https://github.com/Skidamek/AutoModpack/blob/v5.0.0-rc.7/core/src/main/java/pl/skidam/automodpack_core/config/ReconfConfigs.java), [host state and TLS loading](https://github.com/Skidamek/AutoModpack/blob/v5.0.0-rc.7/core/src/main/java/pl/skidam/automodpack_core/protocol/netty/NettyServer.java), [certificate paths](https://github.com/Skidamek/AutoModpack/blob/v5.0.0-rc.7/core/src/main/java/pl/skidam/automodpack_core/storage/StoragePaths.java), and [implementation mod ID](https://github.com/Skidamek/AutoModpack/blob/v5.0.0-rc.7/gradle.properties). The same integration points and mod ID were checked in all seven tagged release candidates.
+
 ## 0.2.0-rc.1 — 2026-11-03 (prerelease)
 
 This is a development prerelease for operators testing AutoModpack discovery and explicit staging reconciliation. Stable `v0.1.0` remains the reference release with a live-validated production renewal pipeline. No live Cloudflare/Let's Encrypt issuance was performed for this prerelease.

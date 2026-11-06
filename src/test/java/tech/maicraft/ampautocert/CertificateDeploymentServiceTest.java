@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CertificateDeploymentServiceTest {
     @TempDir Path root;
+
     private final AtomicInteger transactionSequence = new AtomicInteger();
 
     @Test void validationFailureTouchesNoCredentialFiles() throws Exception {
@@ -223,7 +224,7 @@ class CertificateDeploymentServiceTest {
     private CertificateDeploymentService service(CertificateDeploymentService.MaterialValidator validator,
                                                  CertificateDeploymentService.DeploymentFaultInjector injector)
             throws IOException {
-        return new CertificateDeploymentService(root, validator, true, () -> new UUID(0,
+        return new CertificateDeploymentService(root, validator, false, () -> new UUID(0,
                 transactionSequence.incrementAndGet()).toString(), injector);
     }
 

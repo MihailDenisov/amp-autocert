@@ -86,11 +86,10 @@ final class CredentialTargetInspector {
         auditAcl(file, allowInsecurePermissions, true);
     }
 
-    private static void auditAcl(Path path, boolean allowInsecurePermissions, boolean file) throws IOException {
+    static void auditAcl(Path path, boolean allowInsecurePermissions, boolean file) throws IOException {
         AclFileAttributeView view = Files.getFileAttributeView(path, AclFileAttributeView.class,
                 LinkOption.NOFOLLOW_LINKS);
         if (view == null) {
-            if (allowInsecurePermissions) return;
             throw new IOException("Cannot verify private AutoModpack credential permissions");
         }
         UserPrincipal owner = view.getOwner();
